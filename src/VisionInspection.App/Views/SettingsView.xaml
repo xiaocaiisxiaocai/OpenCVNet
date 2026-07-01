@@ -1,0 +1,182 @@
+<UserControl x:Class="VisionInspection.App.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <UserControl.Resources>
+        <Style x:Key="Field" TargetType="StackPanel">
+            <Setter Property="Margin" Value="0,0,18,10" />
+            <Setter Property="MinWidth" Value="180" />
+        </Style>
+        <Style x:Key="Lbl" TargetType="TextBlock">
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="2,0,0,2" />
+        </Style>
+        <Style x:Key="Num" TargetType="ui:NumberBox">
+            <Setter Property="Width" Value="150" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="MaxDecimalPlaces" Value="0" />
+            <Setter Property="ClearButtonEnabled" Value="False" />
+        </Style>
+        <Style x:Key="Txt" TargetType="TextBox">
+            <Setter Property="Width" Value="150" />
+        </Style>
+        <Style x:Key="CardHdr" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="2,0,0,10">
+            <ui:SymbolIcon Symbol="Settings24" Margin="0,0,8,0" />
+            <TextBlock Text="系统设置" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" />
+            <TextBlock Text="改配置即切换硬件/地址，保存后热生效（settings.json）" VerticalAlignment="Center"
+                       Opacity="0.5" FontSize="12" Margin="12,0,0,0" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- 相机 -->
+                <ui:Card Margin="0,0,0,10" Padding="14">
+                    <StackPanel>
+                        <TextBlock Text="相机" Style="{StaticResource CardHdr}" />
+                        <WrapPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="模式" Style="{StaticResource Lbl}" />
+                                <ComboBox Width="150" ItemsSource="{Binding CameraModes}" SelectedItem="{Binding CameraMode}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}" MinWidth="320">
+                                <TextBlock Text="离线图片文件夹（Offline 模式）" Style="{StaticResource Lbl}" />
+                                <TextBox Width="320" Text="{Binding OfflineFolder}" />
+                            </StackPanel>
+                        </WrapPanel>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- PLC -->
+                <ui:Card Margin="0,0,0,10" Padding="14">
+                    <StackPanel>
+                        <TextBlock Text="PLC" Style="{StaticResource CardHdr}" />
+                        <WrapPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="模式" Style="{StaticResource Lbl}" />
+                                <ComboBox Width="150" ItemsSource="{Binding PlcModes}" SelectedItem="{Binding PlcMode}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="IP 地址（Melsec）" Style="{StaticResource Lbl}" />
+                                <TextBox Style="{StaticResource Txt}" Text="{Binding PlcHost}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="端口" Style="{StaticResource Lbl}" />
+                                <ui:NumberBox Style="{StaticResource Num}" Maximum="65535" Value="{Binding PlcPort, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="超时 (ms)" Style="{StaticResource Lbl}" />
+                                <ui:NumberBox Style="{StaticResource Num}" Maximum="60000" Value="{Binding PlcTimeoutMs, Mode=TwoWay}" />
+                            </StackPanel>
+                        </WrapPanel>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- 检测 -->
+                <ui:Card Margin="0,0,0,10" Padding="14">
+                    <StackPanel>
+                        <TextBlock Text="检测" Style="{StaticResource CardHdr}" />
+                        <WrapPanel VerticalAlignment="Center">
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="灰度阈值（&gt; 视为亮）" Style="{StaticResource Lbl}" />
+                                <ui:NumberBox Style="{StaticResource Num}" Maximum="255" Value="{Binding GrayThreshold, Mode=TwoWay}" />
+                            </StackPanel>
+                            <CheckBox Content="暗像素为前景（背光场景）" IsChecked="{Binding DarkIsForeground}"
+                                      VerticalAlignment="Bottom" Margin="0,0,0,12" />
+                        </WrapPanel>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- 运行 -->
+                <ui:Card Margin="0,0,0,10" Padding="14">
+                    <StackPanel>
+                        <TextBlock Text="运行" Style="{StaticResource CardHdr}" />
+                        <WrapPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="轮询周期 (ms)" Style="{StaticResource Lbl}" />
+                                <ui:NumberBox Style="{StaticResource Num}" Maximum="10000" Value="{Binding PollIntervalMs, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="取像超时 (ms)" Style="{StaticResource Lbl}" />
+                                <ui:NumberBox Style="{StaticResource Num}" Maximum="60000" Value="{Binding GrabTimeoutMs, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="心跳周期 (ms)" Style="{StaticResource Lbl}" />
+                                <ui:NumberBox Style="{StaticResource Num}" Maximum="60000" Value="{Binding HeartbeatIntervalMs, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="检测超时 (ms，0=不超时)" Style="{StaticResource Lbl}" />
+                                <ui:NumberBox Style="{StaticResource Num}" Maximum="120000" Value="{Binding InspectTimeoutMs, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="故障退避 (ms)" Style="{StaticResource Lbl}" />
+                                <ui:NumberBox Style="{StaticResource Num}" Maximum="60000" Value="{Binding FaultBackoffMs, Mode=TwoWay}" />
+                            </StackPanel>
+                        </WrapPanel>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- 归档 -->
+                <ui:Card Margin="0,0,0,10" Padding="14">
+                    <StackPanel>
+                        <TextBlock Text="结果归档" Style="{StaticResource CardHdr}" />
+                        <WrapPanel VerticalAlignment="Center">
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="归档目录" Style="{StaticResource Lbl}" />
+                                <TextBox Style="{StaticResource Txt}" Text="{Binding ArchiveDirectory}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="保留天数（0=永久）" Style="{StaticResource Lbl}" />
+                                <ui:NumberBox Style="{StaticResource Num}" Maximum="3650" Value="{Binding RetentionDays, Mode=TwoWay}" />
+                            </StackPanel>
+                            <CheckBox Content="仅保存 NG 图" IsChecked="{Binding SaveNgImageOnly}"
+                                      VerticalAlignment="Bottom" Margin="0,0,0,12" />
+                        </WrapPanel>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- 握手地址 -->
+                <ui:Card Margin="0,0,0,10" Padding="14">
+                    <StackPanel>
+                        <TextBlock Text="握手软元件地址（按 PLC 程序填写）" Style="{StaticResource CardHdr}" />
+                        <WrapPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="触发位 (PLC→PC)" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding TriggerBit}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="忙位 (PC→PLC)" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding BusyBit}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="完成位" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding DoneBit}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="OK 位" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding OkBit}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="NG 位" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding NgBit}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="心跳位" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding HeartbeatBit}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="型号码字 (PLC→PC)" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding ModelCodeWord}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="缺件位图起始字" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding DefectBitmapWord}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="位图字数" Style="{StaticResource Lbl}" /><ui:NumberBox Style="{StaticResource Num}" Minimum="1" Maximum="64" Value="{Binding DefectBitmapWordCount, Mode=TwoWay}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="错误码字" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding ErrorCodeWord}" /></StackPanel>
+                        </WrapPanel>
+                    </StackPanel>
+                </ui:Card>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+            <ui:Button Content="保存并应用" Appearance="Primary" Command="{Binding SaveCommand}" Margin="0,0,8,0" Padding="16,8" />
+            <ui:Button Content="还原" Command="{Binding ReloadCommand}" Padding="16,8" />
+        </StackPanel>
+
+        <ui:InfoBar Grid.Row="3" Margin="0,10,0,0" IsOpen="True" Severity="Informational"
+                    Title="状态" Message="{Binding StatusMessage}" />
+    </Grid>
+</UserControl>

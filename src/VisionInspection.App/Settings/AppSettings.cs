@@ -36,6 +36,10 @@ namespace VisionInspection.App.Settings
         public int PollIntervalMs { get; set; } = 20;
         public int GrabTimeoutMs { get; set; } = 2000;
         public int HeartbeatIntervalMs { get; set; } = 1000;
+        /// <summary>单次检测超时（毫秒）；卡死写错误码+清忙。0=不超时。</summary>
+        public int InspectTimeoutMs { get; set; } = 8000;
+        /// <summary>故障态轮询退避（毫秒），避免持续故障刷屏。</summary>
+        public int FaultBackoffMs { get; set; } = 2000;
     }
 
     /// <summary>结果归档参数。</summary>

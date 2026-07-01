@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using VisionInspection.Core.Abstractions;
+using VisionInspection.App.Hosting;
 
 namespace VisionInspection.App.ViewModels
 {
@@ -14,12 +14,13 @@ namespace VisionInspection.App.ViewModels
 
         public RecipeManagementViewModel RecipeManagement { get; }
         public RunViewModel Run { get; }
+        public SettingsViewModel Settings { get; }
 
-        public MainWindowViewModel(IRecipeStore recipeStore, RunViewModel run,
-            System.Func<int, int, VisionInspection.Core.Imaging.ImageFrame> captureFunc = null)
+        public MainWindowViewModel(ApplicationHost host, RunViewModel run)
         {
-            RecipeManagement = new RecipeManagementViewModel(recipeStore, captureFunc);
+            RecipeManagement = new RecipeManagementViewModel(host.RecipeStore, host.CaptureFrame);
             Run = run;
+            Settings = new SettingsViewModel(host);
             _currentPage = run;
         }
 
@@ -28,5 +29,8 @@ namespace VisionInspection.App.ViewModels
 
         [RelayCommand]
         private void NavigateToRecipes() => CurrentPage = RecipeManagement;
+
+        [RelayCommand]
+        private void NavigateToSettings() => CurrentPage = Settings;
     }
 }

@@ -68,7 +68,7 @@ namespace VisionInspection.App
                 s.Result.ModelCode, s.Result.Outcome, s.Result.MissingCount);
 
             var runViewModel = new RunViewModel(_host);
-            var mainViewModel = new MainWindowViewModel(_host.RecipeStore, runViewModel, _host.CaptureFrame);
+            var mainViewModel = new MainWindowViewModel(_host, runViewModel);
             var window = new MainWindow(mainViewModel);
             // 首屏渲染后自动触发一次演示检测,使界面立即有内容(真机由 PLC 触发)。
             window.ContentRendered += (s, ev) => { try { _host.SimulateTrigger(); } catch { } };

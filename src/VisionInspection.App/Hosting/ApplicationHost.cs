@@ -10,6 +10,7 @@ using VisionInspection.Infrastructure.Storage;
 using VisionInspection.Plc.Mc;
 using VisionInspection.Plc.Simulation;
 using VisionInspection.Runtime;
+using VisionInspection.Vision.Alignment;
 using VisionInspection.Vision.Detection;
 using VisionInspection.Vision.Inspection;
 
@@ -69,7 +70,9 @@ namespace VisionInspection.App.Hosting
             _plc = CreatePlc(Settings.Plc);
 
             var detector = new ForegroundRatioDetector(Settings.Detection.DarkIsForeground, Settings.Detection.GrayThreshold);
-            var inspector = new OpenCvInspector(null, new IPresenceDetector[] { detector });
+            // 配准:配方 Fiducial.Type=None 时 FiducialAlignment 退化为恒等,故演示不受影响;
+            // 配方配置基准点后即自动补偿底板摆放偏差。
+            var inspector = new OpenCvInspector(new FiducialAlignment(), new IPresenceDetector[] { detector });
 
             var archiver = new InspectionArchiver(
                 Path.Combine(_baseDir, Settings.Archive.Directory),
@@ -79,7 +82,9 @@ namespace VisionInspection.App.Hosting
             {
                 PollIntervalMs = Settings.Runtime.PollIntervalMs,
                 GrabTimeoutMs = Settings.Runtime.GrabTimeoutMs,
-                HeartbeatIntervalMs = Settings.Runtime.HeartbeatIntervalMs
+                HeartbeatIntervalMs = Settings.Runtime.HeartbeatIntervalMs,
+                InspectTimeoutMs = Settings.Runtime.InspectTimeoutMs,
+                FaultBackoffMs = Settings.Runtime.FaultBackoffMs
             };
 
             _runtime = new RuntimeService(_camera, inspector, _plc, RecipeStore, archiver, options,

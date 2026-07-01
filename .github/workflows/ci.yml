@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest   # net48 + WPF + OpenCvSharp(x64) 需 Windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore VisionInspection.sln
+
+      - name: Build (Release)
+        run: dotnet build VisionInspection.sln -c Release --no-restore
+
+      - name: Test (Release)
+        run: dotnet test VisionInspection.sln -c Release --no-build --verbosity normal

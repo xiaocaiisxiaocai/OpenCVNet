@@ -56,6 +56,14 @@
                                 <TextBlock Text="配方管理" VerticalAlignment="Center" />
                             </StackPanel>
                         </ui:Button>
+                        <ui:Button Command="{Binding NavigateToSettingsCommand}"
+                                   HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                   Appearance="Secondary" Margin="0,6,0,0" Padding="12,10">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Settings24" Margin="0,0,10,0" />
+                                <TextBlock Text="系统设置" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ui:Button>
                     </StackPanel>
                 </DockPanel>
             </Border>

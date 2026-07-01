@@ -26,7 +26,8 @@ dotnet run --project src/VisionInspection.App
 
 - 目标框架 **net48**（SDK 风格 csproj，`dotnet build` 可直接编译 WPF，无需 Visual Studio）。
 - 可执行项目均 `PlatformTarget=x64`（OpenCvSharp native 依赖）。
-- 运行时在程序目录生成 `recipes\`、`logs\`、`archive\yyyyMMdd\`。
+- 运行时在程序目录生成 `recipes\`、`logs\`、`archive\yyyyMMdd\`、`settings.json`、`stats.json`、`heartbeat`。
+- **CI**：`.github/workflows/ci.yml` 在 `windows-latest` 上 `dotnet build`+`dotnet test`（net48/WPF/OpenCvSharp 需 Windows runner）。
 
 ## 架构（分层）
 
@@ -37,7 +38,7 @@ Core ──(接口/领域, 零第三方依赖)
  ├─ Plc      自研 MC 3E 协议客户端 + 模拟 PLC + 握手状态机
  └─ Infrastructure  配方存储(JSON) / 结果留档(CSV+NG图,按天保留) / 统计持久化(stats.json) / Serilog
 Runtime ── 编排：相机→检测→PLC握手回写→归档→统计/报警（后台循环）
-App ────── WPF (WPF-UI + CommunityToolkit.Mvvm)：运行监视 / 配方管理
+App ────── WPF (WPF-UI + CommunityToolkit.Mvvm)：运行监视 / 配方管理 / 系统设置
 Watchdog ─ 独立进程，监控主程序崩溃自恢复
 ```
 
@@ -51,7 +52,7 @@ Watchdog ─ 独立进程，监控主程序崩溃自恢复
 
 ## 从演示切换到现场硬件
 
-`src/VisionInspection.App/App.xaml.cs` 的 `OnStartup` 构造 `ApplicationHost`（组合根），由**程序目录的 `settings.json` 驱动**装配——改配置即可切换硬件/地址，无需重编译（首次运行生成默认 = 全模拟演示）：
+`src/VisionInspection.App/App.xaml.cs` 的 `OnStartup` 构造 `ApplicationHost`（组合根），由**程序目录的 `settings.json` 驱动**装配——改配置即可切换硬件/地址，无需重编译（可在 App 的**系统设置**页内编辑并「保存并应用」热生效，或直接改 `settings.json`；首次运行默认 = 全模拟演示）：
 
 | 设置项 | 演示 | 现场 |
 |---|---|---|
@@ -73,6 +74,6 @@ Watchdog ─ 独立进程，监控主程序崩溃自恢复
 - **开机自启脚本**：`scripts\install-autostart.ps1` / `uninstall-autostart.ps1` 装/卸自启项（配合 `docs\deployment.md`）。
 - **看门狗用法**：`VisionInspection.Watchdog.exe [主程序路径]`，缺省监控同目录 `VisionInspection.App.exe`，5 秒轮询。进程不存在→拉起；进程在但心跳文件 `heartbeat`（App 每秒由 UI 线程刷新）超 30s 未更新→判**假死**并结束重启；含重启退避防崩溃风暴。
 - **单实例**：App 与 Watchdog 均用 `Global\...SingleInstance` 命名 Mutex 保证单实例；重复启动 App 会弹框并退出。
-- **配准现状**：`OpenCvInspector` 的 `IAlignment` 默认 `IdentityAlignment`（不做几何校正）；基于 `Recipe.Fiducial` 的真实基准点配准是预留槽位，尚未接入——ROI 直接按标定坐标取用。
+- **配准**：`OpenCvInspector` 默认注入 `FiducialAlignment`——按 `Recipe.Fiducial` 的搜索区检出基准点(mark/角点)、与标定期望位(搜索区中心)求仿射(≥3 点全仿射/2 点相似/1 点平移),经 `RoiMapper` 补偿底板摆放偏差；`Fiducial.Type=None` 时退化为恒等(演示/严格固定场景)。现场需配置基准搜索区并使基准点位于区中心。
 - WPF-UI 采用 **3.0.5**（已验证支持 net48）。
 ```

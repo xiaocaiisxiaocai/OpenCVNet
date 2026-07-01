@@ -19,6 +19,9 @@
             <DataTemplate DataType="{x:Type vm:RunViewModel}">
                 <views:RunView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+                <views:SettingsView />
+            </DataTemplate>
 
             <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
             <conv:NullToVisibilityConverter x:Key="NullToVisibility" />
