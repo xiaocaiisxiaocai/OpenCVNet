@@ -1,0 +1,25 @@
+# 默认:按内容自动判定文本/二进制;文本在 Windows 工作区用 CRLF、仓库存 LF。
+* text=auto eol=crlf
+
+# 明确文本类型(避免误判)
+*.cs      text eol=crlf
+*.xaml    text eol=crlf
+*.csproj  text eol=crlf
+*.sln     text eol=crlf
+*.json    text eol=crlf
+*.md      text eol=crlf
+*.ps1     text eol=crlf
+
+# Shell 脚本必须 LF(否则在类 Unix 下无法执行)
+*.sh      text eol=lf
+
+# 二进制:禁止行尾/文本转换,防止被改坏
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.bmp     binary
+*.ico     binary
+*.gif     binary
+*.dll     binary
+*.exe     binary
+*.pdb     binary
