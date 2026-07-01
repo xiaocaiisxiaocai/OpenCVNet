@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>VisionInspection.Runtime</RootNamespace>
+    <AssemblyName>VisionInspection.Runtime</AssemblyName>
+    <Description>运行编排：相机采集 → 检测 → PLC 握手回写 → 归档 / 统计 / 报警。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VisionInspection.Core\VisionInspection.Core.csproj" />
+    <ProjectReference Include="..\VisionInspection.Plc\VisionInspection.Plc.csproj" />
+    <ProjectReference Include="..\VisionInspection.Infrastructure\VisionInspection.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

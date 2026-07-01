@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>VisionInspection.Vision</RootNamespace>
+    <AssemblyName>VisionInspection.Vision</AssemblyName>
+    <Description>视觉检测核心：Mat 转换、定位配准、逐工位判有无、示教（基于 OpenCvSharp4）。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4" Version="4.10.0.20241108" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20241108" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VisionInspection.Core\VisionInspection.Core.csproj" />
+  </ItemGroup>
+
+</Project>

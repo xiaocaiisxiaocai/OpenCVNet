@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>VisionInspection.Plc</RootNamespace>
+    <AssemblyName>VisionInspection.Plc</AssemblyName>
+    <Description>三菱 PLC 通讯（自研 MC 3E 二进制协议）与检测握手状态机。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VisionInspection.Core\VisionInspection.Core.csproj" />
+  </ItemGroup>
+
+</Project>

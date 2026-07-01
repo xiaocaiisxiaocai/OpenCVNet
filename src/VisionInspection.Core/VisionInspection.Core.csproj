@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>VisionInspection.Core</RootNamespace>
+    <AssemblyName>VisionInspection.Core</AssemblyName>
+    <Description>核心领域模型与抽象接口（零第三方依赖，便于单元测试与替换硬件实现）。</Description>
+  </PropertyGroup>
+
+</Project>

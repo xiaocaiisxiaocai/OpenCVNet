@@ -1,0 +1,146 @@
+<UserControl x:Class="VisionInspection.App.Views.RecipeManagementView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    xmlns:local="clr-namespace:VisionInspection.App.Views"
+    xmlns:models="clr-namespace:VisionInspection.Core.Models;assembly=VisionInspection.Core">
+    <UserControl.Resources>
+        <ObjectDataProvider x:Key="MethodValues" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
+            <ObjectDataProvider.MethodParameters>
+                <x:Type TypeName="models:DetectionMethod" />
+            </ObjectDataProvider.MethodParameters>
+        </ObjectDataProvider>
+    </UserControl.Resources>
+
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 左：配方列表 -->
+        <DockPanel Grid.Column="0" Margin="0,0,12,0">
+            <TextBlock DockPanel.Dock="Top" Text="配方列表" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8" />
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                <ui:Button Content="新建" Command="{Binding NewRecipeCommand}" Margin="0,0,6,0" />
+                <ui:Button Content="删除" Click="OnDelete" Margin="0,0,6,0" />
+                <ui:Button Content="导入" Click="OnImport" Margin="0,0,6,0" />
+                <ui:Button Content="导出" Click="OnExport" />
+            </StackPanel>
+            <ListBox ItemsSource="{Binding ModelCodes}"
+                     SelectedItem="{Binding SelectedModelCode, Mode=TwoWay}" />
+        </DockPanel>
+
+        <!-- 右：编辑区 -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <UniformGrid Grid.Row="0" Columns="4" Margin="0,0,0,8">
+                <StackPanel Margin="0,0,8,0">
+                    <TextBlock Text="型号码" />
+                    <TextBox Text="{Binding ModelCode, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+                <StackPanel Margin="0,0,8,0">
+                    <TextBlock Text="名称" />
+                    <TextBox Text="{Binding RecipeName, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+                <StackPanel Margin="0,0,8,0">
+                    <TextBlock Text="行数" />
+                    <ui:NumberBox Value="{Binding Rows, Mode=TwoWay}" Minimum="0" Maximum="200"
+                                  SmallChange="1" MaxDecimalPlaces="0" ClearButtonEnabled="False" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Text="列数" />
+                    <ui:NumberBox Value="{Binding Columns, Mode=TwoWay}" Minimum="0" Maximum="200"
+                                  SmallChange="1" MaxDecimalPlaces="0" ClearButtonEnabled="False" />
+                </StackPanel>
+            </UniformGrid>
+
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="工位（逐工位独立 ROI，大小可各异）" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <ui:Button Content="添加工位" Command="{Binding AddStationCommand}" Margin="0,0,6,0" />
+                <ui:Button Content="删除选中" Command="{Binding RemoveStationCommand}" />
+            </StackPanel>
+
+            <TabControl Grid.Row="2">
+                <TabItem Header="图形标定">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Top" Background="#14000000" CornerRadius="6" Padding="8" Margin="0,0,0,6">
+                            <WrapPanel>
+                                <ui:Button Content="相机取图" Command="{Binding CaptureFromCameraCommand}" Margin="0,0,6,4"
+                                           Visibility="{Binding CanCaptureFromCamera, Converter={StaticResource BoolToVisibility}}" />
+                                <ui:Button Content="加载样张" Click="OnLoadReferenceImage" Margin="0,0,6,4" />
+                                <ui:Button Content="自动识别工位" Command="{Binding AutoDetectStationsCommand}"
+                                           Appearance="Primary" Margin="0,0,6,4" />
+                                <ComboBox ItemsSource="{Binding PartPolarityOptions}"
+                                          SelectedItem="{Binding PartPolarity, Mode=TwoWay}"
+                                          Width="80" Margin="0,0,14,4" VerticalAlignment="Center">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource PolarityName}}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <TextBlock Text="网格" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                <ui:NumberBox Value="{Binding GridRows, Mode=TwoWay}" Minimum="1" Maximum="200"
+                                              SmallChange="1" MaxDecimalPlaces="0" ClearButtonEnabled="False"
+                                              Width="110" Margin="0,0,2,4" />
+                                <TextBlock Text="×" VerticalAlignment="Center" Margin="2,0" />
+                                <ui:NumberBox Value="{Binding GridColumns, Mode=TwoWay}" Minimum="1" Maximum="200"
+                                              SmallChange="1" MaxDecimalPlaces="0" ClearButtonEnabled="False"
+                                              Width="110" Margin="0,0,10,4" />
+                                <TextBlock Text="边距" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                <ui:NumberBox Value="{Binding GridPadding, Mode=TwoWay}" Minimum="0" Maximum="500"
+                                              SmallChange="1" MaxDecimalPlaces="0" ClearButtonEnabled="False"
+                                              Width="110" Margin="0,0,10,4" />
+                                <ui:Button Content="生成网格" Command="{Binding GenerateGridCommand}" Margin="0,0,14,4" />
+                                <TextBlock Text="拖拽画框 · 点选 · 拖动移动 · 右下角缩放 · 删除选中" VerticalAlignment="Center" Opacity="0.5" />
+                            </WrapPanel>
+                        </Border>
+                        <local:RoiCanvas />
+                    </DockPanel>
+                </TabItem>
+                <TabItem Header="工位表格">
+                    <DataGrid ItemsSource="{Binding Stations}" SelectedItem="{Binding SelectedStation}"
+                              AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="序号" Binding="{Binding Index}" IsReadOnly="True" Width="50" />
+                            <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="110" />
+                            <DataGridTextColumn Header="X" Binding="{Binding X}" Width="60" />
+                            <DataGridTextColumn Header="Y" Binding="{Binding Y}" Width="60" />
+                            <DataGridTextColumn Header="宽" Binding="{Binding Width}" Width="60" />
+                            <DataGridTextColumn Header="高" Binding="{Binding Height}" Width="60" />
+                            <DataGridTextColumn Header="阈值" Binding="{Binding Threshold}" Width="70" />
+                            <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled}" Width="50" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </TabItem>
+            </TabControl>
+
+            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
+                <TextBlock Text="判定方法：" VerticalAlignment="Center" />
+                <ComboBox Width="170" Margin="6,0,12,0"
+                          ItemsSource="{Binding ImplementedMethods}"
+                          SelectedItem="{Binding SelectedStation.Method}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource MethodName}}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <ui:Button Content="示教（满件/缺件样张自动定阈值）" Click="OnTeach" Margin="0,0,12,0" />
+                <ui:Button Content="保存配方" Appearance="Primary" Command="{Binding SaveCommand}" />
+            </StackPanel>
+
+            <ui:InfoBar Grid.Row="4" Margin="0,8,0,0" IsOpen="True" Severity="Informational"
+                        Title="状态" Message="{Binding StatusMessage}" />
+        </Grid>
+    </Grid>
+</UserControl>

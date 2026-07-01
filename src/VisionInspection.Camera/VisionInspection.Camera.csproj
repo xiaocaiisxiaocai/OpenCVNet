@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>VisionInspection.Camera</RootNamespace>
+    <AssemblyName>VisionInspection.Camera</AssemblyName>
+    <Description>相机采集实现：离线图像回放（System.Drawing），后续接入海康 MVS 等工业相机 SDK。</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VisionInspection.Core\VisionInspection.Core.csproj" />
+  </ItemGroup>
+
+</Project>

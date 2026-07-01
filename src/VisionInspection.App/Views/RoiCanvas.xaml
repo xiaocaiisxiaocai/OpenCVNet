@@ -1,0 +1,61 @@
+<UserControl x:Class="VisionInspection.App.Views.RoiCanvas"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Background="#22000000">
+        <TextBlock Text="点上方「相机取图」或「加载样张」获取标定底图，然后在图上拖拽画框"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.45"
+                   Visibility="{Binding ReferenceImage, Converter={StaticResource NullToVisibility}}" />
+
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Viewbox Stretch="Uniform" Margin="6">
+                <Grid Width="{Binding ReferenceImageWidth}" Height="{Binding ReferenceImageHeight}">
+                    <Image Source="{Binding ReferenceImage}" Stretch="Fill" />
+                    <Canvas x:Name="Overlay" Background="Transparent"
+                            MouseLeftButtonDown="OnDown" MouseMove="OnMove" MouseLeftButtonUp="OnUp">
+                        <ItemsControl ItemsSource="{Binding Stations}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><Canvas /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Canvas.Left" Value="{Binding X}" />
+                                    <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Width="{Binding Width}" Height="{Binding Height}">
+                                        <Rectangle>
+                                            <Rectangle.Style>
+                                                <Style TargetType="Rectangle">
+                                                    <Setter Property="Stroke" Value="#FF9800" />
+                                                    <Setter Property="StrokeThickness" Value="2" />
+                                                    <Setter Property="Fill" Value="#22FF9800" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                            <Setter Property="Stroke" Value="#40C4FF" />
+                                                            <Setter Property="StrokeThickness" Value="3" />
+                                                            <Setter Property="Fill" Value="#3340C4FF" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Rectangle.Style>
+                                        </Rectangle>
+                                        <Border Background="#CC000000" HorizontalAlignment="Left" VerticalAlignment="Top" Padding="4,1">
+                                            <TextBlock Text="{Binding Index}" Foreground="White" FontSize="12" FontWeight="Bold" />
+                                        </Border>
+                                        <Rectangle Width="12" Height="12" Fill="#40C4FF" Stroke="White" StrokeThickness="1"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                   Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Rectangle x:Name="RubberBand" Stroke="#40C4FF" StrokeThickness="1"
+                                   StrokeDashArray="3 2" IsHitTestVisible="False" Visibility="Collapsed" />
+                    </Canvas>
+                </Grid>
+            </Viewbox>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -1,0 +1,30 @@
+# —— .NET 构建产物 ——
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.user
+*.suo
+*.userprefs
+
+# —— IDE / 工具 ——
+.vs/
+.vscode/
+.idea/
+.claude/
+
+# —— 运行期生成物(程序目录 recipes/logs/archive/stats.json/heartbeat 等) ——
+/logs/
+/archive/
+/recipes/*.json
+/stats.json
+/heartbeat
+watchdog.log
+*.log
+
+# —— 临时/杂项 ——
+_ui_*.png
+*.tmp
+Thumbs.db
