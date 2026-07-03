@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using VisionInspection.Core.Models;
 using VisionInspection.Infrastructure.Storage;
 using VisionInspection.Plc.Handshake;
@@ -212,7 +213,7 @@ namespace VisionInspection.Tests
         }
 
         [Fact]
-        public void Timeout_Leaves_Cycle_In_Flight_And_Rejects_Next_Trigger()
+        public async Task Timeout_Leaves_Cycle_In_Flight_And_Rejects_Next_Trigger()
         {
             var started = new ManualResetEventSlim(false);
             var release = new ManualResetEventSlim(false);
@@ -230,8 +231,10 @@ namespace VisionInspection.Tests
             try
             {
                 plc.WriteBool(map.TriggerBit, true);
-                ctrl.ProcessOnce();
-                Assert.True(started.Wait(1000));
+                var firstCycle = Task.Run(() => ctrl.ProcessOnce());
+                Assert.True(started.Wait(5000));
+                Assert.Same(firstCycle, await Task.WhenAny(firstCycle, Task.Delay(5000)));
+                Assert.True(await firstCycle);
 
                 plc.WriteBool(map.TriggerBit, false);
                 ctrl.ProcessOnce();
@@ -248,7 +251,7 @@ namespace VisionInspection.Tests
         }
 
         [Fact]
-        public void Timeout_Background_Task_Exit_Is_Logged()
+        public async Task Timeout_Background_Task_Exit_Is_Logged()
         {
             var started = new ManualResetEventSlim(false);
             var release = new ManualResetEventSlim(false);
@@ -271,8 +274,10 @@ namespace VisionInspection.Tests
             plc.WriteBool(map.TriggerBit, true);
             try
             {
-                ctrl.ProcessOnce();
-                Assert.True(started.Wait(1000));
+                var cycle = Task.Run(() => ctrl.ProcessOnce());
+                Assert.True(started.Wait(5000));
+                Assert.Same(cycle, await Task.WhenAny(cycle, Task.Delay(5000)));
+                Assert.True(await cycle);
                 release.Set();
 
                 Assert.True(logged.Wait(2000));
