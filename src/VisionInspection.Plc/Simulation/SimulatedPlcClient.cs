@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using VisionInspection.Core.Abstractions;
 
@@ -12,9 +12,9 @@ namespace VisionInspection.Plc.Simulation
     {
         private static readonly Regex AddressPattern = new Regex(@"^([A-Z]+)(\d+)$", RegexOptions.Compiled);
 
-        private readonly Dictionary<string, bool> _bits = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, ushort> _words = new Dictionary<string, ushort>(StringComparer.OrdinalIgnoreCase);
-        private bool _connected;
+        private readonly ConcurrentDictionary<string, bool> _bits = new ConcurrentDictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, ushort> _words = new ConcurrentDictionary<string, ushort>(StringComparer.OrdinalIgnoreCase);
+        private bool _connected = true;
 
         public bool IsConnected => _connected;
         public event EventHandler<PlcConnectionEventArgs> ConnectionChanged;
@@ -31,14 +31,33 @@ namespace VisionInspection.Plc.Simulation
             ConnectionChanged?.Invoke(this, new PlcConnectionEventArgs(false));
         }
 
-        public bool ReadBool(string address) => _bits.TryGetValue(Norm(address), out var v) && v;
-        public void WriteBool(string address, bool value) => _bits[Norm(address)] = value;
+        public bool ReadBool(string address)
+        {
+            EnsureConnected();
+            return _bits.TryGetValue(Norm(address), out var v) && v;
+        }
 
-        public short ReadInt16(string address) => (short)(_words.TryGetValue(Norm(address), out var v) ? v : (ushort)0);
-        public void WriteInt16(string address, short value) => _words[Norm(address)] = (ushort)value;
+        public void WriteBool(string address, bool value)
+        {
+            EnsureConnected();
+            _bits[Norm(address)] = value;
+        }
+
+        public short ReadInt16(string address)
+        {
+            EnsureConnected();
+            return (short)(_words.TryGetValue(Norm(address), out var v) ? v : (ushort)0);
+        }
+
+        public void WriteInt16(string address, short value)
+        {
+            EnsureConnected();
+            _words[Norm(address)] = (ushort)value;
+        }
 
         public ushort[] ReadUInt16(string address, ushort length)
         {
+            EnsureConnected();
             var (prefix, start) = Split(address);
             var result = new ushort[length];
             for (int i = 0; i < length; i++)
@@ -48,6 +67,7 @@ namespace VisionInspection.Plc.Simulation
 
         public void WriteUInt16(string address, ushort[] values)
         {
+            EnsureConnected();
             if (values == null) throw new ArgumentNullException(nameof(values));
             var (prefix, start) = Split(address);
             for (int i = 0; i < values.Length; i++)
@@ -55,6 +75,11 @@ namespace VisionInspection.Plc.Simulation
         }
 
         public void Dispose() { }
+
+        private void EnsureConnected()
+        {
+            if (!_connected) throw new InvalidOperationException("PLC 未连接。");
+        }
 
         private static string Norm(string a) => a.Trim().ToUpperInvariant();
 

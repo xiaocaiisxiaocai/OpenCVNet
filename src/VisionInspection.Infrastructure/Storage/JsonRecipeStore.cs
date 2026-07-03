@@ -51,16 +51,32 @@ namespace VisionInspection.Infrastructure.Storage
             var recipe = JsonConvert.DeserializeObject<Recipe>(File.ReadAllText(path), Settings);
             if (recipe == null)
                 throw new InvalidDataException($"配方文件内容无效：{path}");
+            RecipeValidator.Validate(recipe, int.MaxValue / 16);
             return recipe;
         }
 
         public bool TryLoad(string modelCode, out Recipe recipe)
         {
             recipe = null;
-            var path = PathOf(modelCode);
-            if (!File.Exists(path)) return false;
-            recipe = JsonConvert.DeserializeObject<Recipe>(File.ReadAllText(path), Settings);
-            return recipe != null;
+            try
+            {
+                var path = PathOf(modelCode);
+                if (!File.Exists(path)) return false;
+                recipe = JsonConvert.DeserializeObject<Recipe>(File.ReadAllText(path), Settings);
+                if (recipe == null) return false;
+                RecipeValidator.Validate(recipe, int.MaxValue / 16);
+                return true;
+            }
+            catch (JsonException)
+            {
+                recipe = null;
+                return false;
+            }
+            catch (IOException)
+            {
+                recipe = null;
+                return false;
+            }
         }
 
         public void Save(Recipe recipe)
@@ -68,17 +84,12 @@ namespace VisionInspection.Infrastructure.Storage
             if (recipe == null) throw new ArgumentNullException(nameof(recipe));
             if (string.IsNullOrWhiteSpace(recipe.ModelCode))
                 throw new ArgumentException("配方型号码不能为空。", nameof(recipe));
+            RecipeValidator.Validate(recipe, int.MaxValue / 16);
 
             var path = PathOf(recipe.ModelCode);
             var json = JsonConvert.SerializeObject(recipe, Settings);
 
-            // 原子写：先写临时文件，再替换正式文件，避免写入中断导致配方损坏。
-            var tmp = path + ".tmp";
-            File.WriteAllText(tmp, json);
-            if (File.Exists(path))
-                File.Replace(tmp, path, null);
-            else
-                File.Move(tmp, path);
+            AtomicFile.WriteText(path, json, backup: true);
         }
 
         public void Delete(string modelCode)

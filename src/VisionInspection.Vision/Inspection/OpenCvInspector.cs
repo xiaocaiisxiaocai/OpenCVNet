@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using OpenCvSharp;
 using VisionInspection.Core.Abstractions;
@@ -37,7 +38,11 @@ namespace VisionInspection.Vision.Inspection
         }
 
         public InspectionResult Inspect(ImageFrame frame, Recipe recipe)
+            => Inspect(frame, recipe, CancellationToken.None);
+
+        public InspectionResult Inspect(ImageFrame frame, Recipe recipe, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (frame == null) throw new ArgumentNullException(nameof(frame));
             if (recipe == null)
                 return InspectionResult.CreateError(null, "NO_RECIPE", "配方为空。", DateTime.UtcNow);
@@ -45,54 +50,82 @@ namespace VisionInspection.Vision.Inspection
             var sw = Stopwatch.StartNew();
             using (var image = MatConverter.ToMat(frame))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var align = _alignment.Align(image, recipe.Fiducial);
-                if (!align.Success)
-                {
-                    align.Affine?.Dispose();
-                    return InspectionResult.CreateError(recipe.ModelCode, "ALIGN_FAIL",
-                        align.Message ?? "定位配准失败。", DateTime.UtcNow);
-                }
-
-                var stations = recipe.Stations ?? new List<Station>();
-                var results = new StationResult[stations.Count];
-                try
-                {
-                    Parallel.For(0, stations.Count, i =>
+                    if (!align.Success)
                     {
-                        results[i] = InspectStation(image, stations[i], align.Affine);
-                    });
-                }
-                finally
-                {
-                    align.Affine?.Dispose();
-                }
+                        return InspectionResult.CreateError(recipe.ModelCode, "ALIGN_FAIL",
+                            align.Message ?? "定位配准失败。", DateTime.UtcNow);
+                    }
 
-                var list = new List<StationResult>(results);
-                var outcome = list.Any(r => r.State != PresenceState.Present)
-                    ? InspectionOutcome.Ng
-                    : InspectionOutcome.Ok;
+                    var stations = recipe.Stations ?? new List<Station>();
+                    if (stations.Count == 0 || stations.All(s => !s.Enabled))
+                    {
+                        return InspectionResult.CreateError(recipe.ModelCode, "NO_STATION",
+                            "配方没有启用工位。", DateTime.UtcNow);
+                    }
 
-                sw.Stop();
-                return new InspectionResult(recipe.ModelCode, outcome, list, DateTime.UtcNow, (int)sw.ElapsedMilliseconds);
+                    var results = new StationResult[stations.Count];
+                    Mat inspectImage = image;
+                    try
+                    {
+                        inspectImage = WarpToCalibration(image, align);
+                        Parallel.For(0, stations.Count, i =>
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            try
+                            {
+                                results[i] = InspectStation(inspectImage, stations[i]);
+                            }
+                            catch
+                            {
+                                results[i] = new StationResult(stations[i].Index, PresenceState.Unknown, 0.0, stations[i].Threshold);
+                            }
+                        });
+                    }
+                    finally
+                    {
+                        if (!ReferenceEquals(inspectImage, image)) inspectImage.Dispose();
+                    }
+
+                    var list = new List<StationResult>(results);
+                    var outcome = list.Any(r => r.State != PresenceState.Present)
+                        ? InspectionOutcome.Ng
+                        : InspectionOutcome.Ok;
+
+                    sw.Stop();
+                    return new InspectionResult(recipe.ModelCode, outcome, list, DateTime.UtcNow, (int)sw.ElapsedMilliseconds);
             }
         }
 
-        private StationResult InspectStation(Mat image, Station st, Mat affine)
+        private StationResult InspectStation(Mat image, Station st)
         {
             if (!st.Enabled)
                 return new StationResult(st.Index, PresenceState.Present, 1.0, st.Threshold);
 
-            var mapped = RoiMapper.Clamp(RoiMapper.Map(st.Roi, affine), image.Width, image.Height);
+            var mapped = RoiMapper.Clamp(st.Roi, image.Width, image.Height);
             if (mapped.Width <= 0 || mapped.Height <= 0)
                 return new StationResult(st.Index, PresenceState.Unknown, 0.0, st.Threshold);
 
             using (var roi = new Mat(image, new Rect(mapped.X, mapped.Y, mapped.Width, mapped.Height)))
             {
-                var detector = _detectors.TryGetValue(st.Method, out var d)
-                    ? d
-                    : _detectors[DetectionMethod.ForegroundRatio];
+                if (!_detectors.TryGetValue(st.Method, out var detector))
+                    return new StationResult(st.Index, PresenceState.Unknown, 0.0, st.Threshold);
                 var output = detector.Detect(roi, st);
                 return new StationResult(st.Index, output.State, output.Score, st.Threshold);
+            }
+        }
+
+        private static Mat WarpToCalibration(Mat image, AlignmentResult alignment)
+        {
+            using (var affine = alignment.ToMat())
+            using (var inverse = new Mat())
+            {
+                Cv2.InvertAffineTransform(affine, inverse);
+                var warped = new Mat();
+                Cv2.WarpAffine(image, warped, inverse, new Size(image.Width, image.Height),
+                    InterpolationFlags.Linear, BorderTypes.Constant, Scalar.Black);
+                return warped;
             }
         }
     }

@@ -19,10 +19,14 @@ namespace VisionInspection.Tests
             Assert.Equal(100, m.Number);
             Assert.True(m.IsBit);
 
-            // X 为十六进制号
-            var x = DeviceCode.Parse("X1F");
+            // FX 系列 X/Y 按八进制号解析，X20 = 十进制 16。
+            var x = DeviceCode.Parse("X20");
             Assert.Equal(0x9C, x.Code);
-            Assert.Equal(0x1F, x.Number);
+            Assert.Equal(16, x.Number);
+
+            var zr = DeviceCode.Parse("ZR10");
+            Assert.Equal(0xB0, zr.Code);
+            Assert.Equal(0x10, zr.Number);
         }
 
         [Fact]

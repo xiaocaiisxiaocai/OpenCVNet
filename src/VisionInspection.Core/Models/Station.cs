@@ -24,6 +24,9 @@ namespace VisionInspection.Core.Models
         /// <summary>判定阈值，含义随 <see cref="Method"/>（如前景占比阈值 0~1）。</summary>
         public double Threshold { get; set; } = 0.5;
 
+        /// <summary>可选工位级前景极性；null 表示继承全局检测器配置。</summary>
+        public bool? DarkIsForeground { get; set; }
+
         /// <summary>是否启用该工位检测（false 则跳过，不计入判定）。</summary>
         public bool Enabled { get; set; } = true;
 

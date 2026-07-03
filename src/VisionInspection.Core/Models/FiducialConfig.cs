@@ -24,5 +24,14 @@ namespace VisionInspection.Core.Models
 
         /// <summary>基准搜索区域（Mark / 角点大致位置），加速并稳定定位。</summary>
         public List<RoiRect> SearchRegions { get; set; } = new List<RoiRect>();
+
+        /// <summary>要求至少检出的基准点数量；0 表示必须检出全部配置搜索区。</summary>
+        public int MinDetectedMarks { get; set; } = 0;
+
+        public double MaxResidualPixels { get; set; } = 8.0;
+        public double MaxRmsResidualPixels { get; set; } = 5.0;
+        public double MinScale { get; set; } = 0.9;
+        public double MaxScale { get; set; } = 1.1;
+        public double MaxRotationDegrees { get; set; } = 15.0;
     }
 }

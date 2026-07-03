@@ -20,6 +20,6 @@ namespace VisionInspection.Core.Models
         }
 
         public bool IsPresent => State == PresenceState.Present;
-        public bool IsMissing => State == PresenceState.Absent;
+        public bool IsMissing => State != PresenceState.Present;
     }
 }

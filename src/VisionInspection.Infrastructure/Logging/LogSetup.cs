@@ -17,9 +17,11 @@ namespace VisionInspection.Infrastructure.Logging
                 .WriteTo.File(
                     Path.Combine(logDir, "vi-.log"),
                     rollingInterval: RollingInterval.Day,
+                    fileSizeLimitBytes: 50 * 1024 * 1024,
+                    rollOnFileSizeLimit: true,
                     retainedFileCountLimit: 30,
                     encoding: Encoding.UTF8,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
                 .CreateLogger();
         }
     }

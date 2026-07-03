@@ -33,6 +33,12 @@ namespace VisionInspection.Vision.Alignment
             if (curPts.Count == 0)
                 return AlignmentResult.Fail("未在搜索区检出任何基准点");
 
+            int requiredMarks = fiducial.MinDetectedMarks > 0
+                ? fiducial.MinDetectedMarks
+                : fiducial.SearchRegions.Count;
+            if (curPts.Count < requiredMarks)
+                return AlignmentResult.Fail($"基准点数量不足({curPts.Count}/{requiredMarks})。");
+
             Mat affine;
             if (curPts.Count >= 3)
                 affine = Cv2.EstimateAffine2D(InputArray.Create(refPts.ToArray()), InputArray.Create(curPts.ToArray()));
@@ -44,7 +50,16 @@ namespace VisionInspection.Vision.Alignment
             if (affine == null || affine.Empty())
                 return AlignmentResult.Fail("基准点求解仿射失败(点数不足或退化)");
 
-            return new AlignmentResult(true, affine);
+            var quality = CheckQuality(affine, refPts, curPts, fiducial);
+            if (quality != null)
+            {
+                affine.Dispose();
+                return AlignmentResult.Fail(quality);
+            }
+
+            var result = new AlignmentResult(true, ToArray(affine));
+            affine.Dispose();
+            return result;
         }
 
         /// <summary>在搜索区内检出最显著 blob 的质心(两种极性各试),返回图像绝对坐标。</summary>
@@ -108,6 +123,61 @@ namespace VisionInspection.Vision.Alignment
             m.Set(0, 0, 1.0); m.Set(0, 1, 0.0); m.Set(0, 2, dx);
             m.Set(1, 0, 0.0); m.Set(1, 1, 1.0); m.Set(1, 2, dy);
             return m;
+        }
+
+        private static double[] ToArray(Mat affine)
+        {
+            return new[]
+            {
+                affine.At<double>(0, 0),
+                affine.At<double>(0, 1),
+                affine.At<double>(0, 2),
+                affine.At<double>(1, 0),
+                affine.At<double>(1, 1),
+                affine.At<double>(1, 2)
+            };
+        }
+
+        private static string CheckQuality(Mat affine, IReadOnlyList<Point2f> refPts, IReadOnlyList<Point2f> curPts, FiducialConfig fiducial)
+        {
+            double maxResidual = 0;
+            double sumResidual2 = 0;
+            for (int i = 0; i < refPts.Count; i++)
+            {
+                double x = affine.At<double>(0, 0) * refPts[i].X +
+                           affine.At<double>(0, 1) * refPts[i].Y +
+                           affine.At<double>(0, 2);
+                double y = affine.At<double>(1, 0) * refPts[i].X +
+                           affine.At<double>(1, 1) * refPts[i].Y +
+                           affine.At<double>(1, 2);
+                double dx = x - curPts[i].X;
+                double dy = y - curPts[i].Y;
+                double residual = Math.Sqrt(dx * dx + dy * dy);
+                maxResidual = Math.Max(maxResidual, residual);
+                sumResidual2 += residual * residual;
+            }
+
+            double rmsResidual = Math.Sqrt(sumResidual2 / refPts.Count);
+            if (maxResidual > fiducial.MaxResidualPixels || rmsResidual > fiducial.MaxRmsResidualPixels)
+                return $"配准残差超限(max={maxResidual:F1}px,rms={rmsResidual:F1}px)。";
+
+            double a = affine.At<double>(0, 0);
+            double b = affine.At<double>(0, 1);
+            double c = affine.At<double>(1, 0);
+            double d = affine.At<double>(1, 1);
+            double det = a * d - b * c;
+            if (det <= 0) return "配准矩阵方向异常。";
+
+            double sx = Math.Sqrt(a * a + c * c);
+            double sy = Math.Sqrt(b * b + d * d);
+            if (sx < fiducial.MinScale || sx > fiducial.MaxScale || sy < fiducial.MinScale || sy > fiducial.MaxScale)
+                return "配准尺度超限。";
+
+            double angle = Math.Atan2(c, a) * 180.0 / Math.PI;
+            if (Math.Abs(angle) > fiducial.MaxRotationDegrees)
+                return "配准旋转角超限。";
+
+            return null;
         }
     }
 }

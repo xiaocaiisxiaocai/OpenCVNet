@@ -1,4 +1,5 @@
 using VisionInspection.Plc.Simulation;
+using System;
 using Xunit;
 
 namespace VisionInspection.Tests
@@ -38,6 +39,18 @@ namespace VisionInspection.Tests
         {
             var plc = new SimulatedPlcClient();
             Assert.Equal(new ushort[] { 0, 0 }, plc.ReadUInt16("D500", 2));
+        }
+
+        [Fact]
+        public void Read_And_Write_Throw_When_Disconnected()
+        {
+            var plc = new SimulatedPlcClient();
+            plc.Connect();
+            plc.WriteBool("M100", true);
+            plc.Disconnect();
+
+            Assert.Throws<InvalidOperationException>(() => plc.ReadBool("M100"));
+            Assert.Throws<InvalidOperationException>(() => plc.WriteBool("M100", false));
         }
     }
 }

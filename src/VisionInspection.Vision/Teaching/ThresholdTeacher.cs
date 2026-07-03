@@ -40,26 +40,51 @@ namespace VisionInspection.Vision.Teaching
         {
             if (recipe == null) throw new ArgumentNullException(nameof(recipe));
 
-            var present = ScoreAll(recipe, presentSamples);
-            var absent = ScoreAll(recipe, absentSamples);
+            var presentBright = ScoreAll(recipe, presentSamples, darkForeground: false);
+            var absentBright = ScoreAll(recipe, absentSamples, darkForeground: false);
+            var presentDark = ScoreAll(recipe, presentSamples, darkForeground: true);
+            var absentDark = ScoreAll(recipe, absentSamples, darkForeground: true);
 
             var thresholds = new Dictionary<int, double>();
             foreach (var st in recipe.Stations)
             {
-                bool hasP = present.TryGetValue(st.Index, out var ps) && ps.Count > 0;
-                bool hasA = absent.TryGetValue(st.Index, out var av) && av.Count > 0;
-                if (!hasP || !hasA) continue;
+                var bright = TryBuildThreshold(presentBright, absentBright, st.Index, out var brightThreshold, out var brightMargin);
+                var dark = TryBuildThreshold(presentDark, absentDark, st.Index, out var darkThreshold, out var darkMargin);
+                if (!bright && !dark) continue;
 
-                double minPresent = ps.Min();
-                double maxAbsent = av.Max();
-                double threshold = (minPresent + maxAbsent) / 2.0;
+                bool useDark = dark && (!bright || darkMargin > brightMargin);
+                double threshold = useDark ? darkThreshold : brightThreshold;
+                if (threshold < 0 || threshold > 1)
+                    throw new InvalidOperationException($"工位 {st.Index} 满件/缺件样本不可分，请检查光源、ROI 或极性。");
                 st.Threshold = threshold;
+                st.DarkIsForeground = useDark;
                 thresholds[st.Index] = threshold;
             }
             return thresholds;
         }
 
-        private Dictionary<int, List<double>> ScoreAll(Recipe recipe, IEnumerable<ImageFrame> samples)
+        private static bool TryBuildThreshold(
+            Dictionary<int, List<double>> present,
+            Dictionary<int, List<double>> absent,
+            int index,
+            out double threshold,
+            out double margin)
+        {
+            threshold = -1;
+            margin = -1;
+            bool hasP = present.TryGetValue(index, out var ps) && ps.Count > 0;
+            bool hasA = absent.TryGetValue(index, out var av) && av.Count > 0;
+            if (!hasP || !hasA) return false;
+
+            double minPresent = ps.Min();
+            double maxAbsent = av.Max();
+            margin = minPresent - maxAbsent;
+            if (margin <= 0) return false;
+            threshold = (minPresent + maxAbsent) / 2.0;
+            return true;
+        }
+
+        private Dictionary<int, List<double>> ScoreAll(Recipe recipe, IEnumerable<ImageFrame> samples, bool darkForeground)
         {
             var acc = new Dictionary<int, List<double>>();
             if (samples == null) return acc;
@@ -69,20 +94,25 @@ namespace VisionInspection.Vision.Teaching
                 using (var image = MatConverter.ToMat(frame))
                 {
                     var align = _alignment.Align(image, recipe.Fiducial);
+                    if (!align.Success) continue;
+                    Mat sampleImage = image;
                     try
                     {
-                        if (!align.Success) continue;
+                        sampleImage = WarpToCalibration(image, align);
                         foreach (var st in recipe.Stations)
                         {
-                            var mapped = RoiMapper.Clamp(RoiMapper.Map(st.Roi, align.Affine), image.Width, image.Height);
+                            var mapped = RoiMapper.Clamp(st.Roi, sampleImage.Width, sampleImage.Height);
                             if (mapped.Width <= 0 || mapped.Height <= 0) continue;
 
-                            using (var roi = new Mat(image, new Rect(mapped.X, mapped.Y, mapped.Width, mapped.Height)))
+                            using (var roi = new Mat(sampleImage, new Rect(mapped.X, mapped.Y, mapped.Width, mapped.Height)))
                             {
-                                var det = _detectors.TryGetValue(st.Method, out var d)
-                                    ? d
-                                    : _detectors[DetectionMethod.ForegroundRatio];
-                                var output = det.Detect(roi, st);
+                                if (!_detectors.TryGetValue(st.Method, out var det))
+                                    continue;
+                                var original = st.DarkIsForeground;
+                                st.DarkIsForeground = darkForeground;
+                                DetectionOutput output;
+                                try { output = det.Detect(roi, st); }
+                                finally { st.DarkIsForeground = original; }
                                 if (!acc.TryGetValue(st.Index, out var list))
                                 {
                                     list = new List<double>();
@@ -94,11 +124,24 @@ namespace VisionInspection.Vision.Teaching
                     }
                     finally
                     {
-                        align.Affine?.Dispose();
+                        if (!ReferenceEquals(sampleImage, image)) sampleImage.Dispose();
                     }
                 }
             }
             return acc;
+        }
+
+        private static Mat WarpToCalibration(Mat image, AlignmentResult alignment)
+        {
+            using (var affine = alignment.ToMat())
+            using (var inverse = new Mat())
+            {
+                Cv2.InvertAffineTransform(affine, inverse);
+                var warped = new Mat();
+                Cv2.WarpAffine(image, warped, inverse, new Size(image.Width, image.Height),
+                    InterpolationFlags.Linear, BorderTypes.Constant, Scalar.Black);
+                return warped;
+            }
         }
     }
 }

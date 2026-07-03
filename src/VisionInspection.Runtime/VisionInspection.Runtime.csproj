@@ -12,7 +12,6 @@
   <ItemGroup>
     <ProjectReference Include="..\VisionInspection.Core\VisionInspection.Core.csproj" />
     <ProjectReference Include="..\VisionInspection.Plc\VisionInspection.Plc.csproj" />
-    <ProjectReference Include="..\VisionInspection.Infrastructure\VisionInspection.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

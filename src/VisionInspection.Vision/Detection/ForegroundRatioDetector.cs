@@ -40,7 +40,8 @@ namespace VisionInspection.Vision.Detection
                 int total = bin.Rows * bin.Cols;
                 if (total == 0) return new DetectionOutput(PresenceState.Unknown, 0.0);
 
-                int fg = DarkIsForeground ? (total - white) : white;
+                bool dark = station.DarkIsForeground ?? DarkIsForeground;
+                int fg = dark ? (total - white) : white;
                 double ratio = (double)fg / total;
                 var state = ratio >= station.Threshold ? PresenceState.Present : PresenceState.Absent;
                 return new DetectionOutput(state, ratio);

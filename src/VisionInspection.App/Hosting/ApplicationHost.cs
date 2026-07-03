@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using VisionInspection.App.Settings;
-using VisionInspection.Camera.Offline;
+using VisionInspection.Camera;
 using VisionInspection.Camera.Simulation;
 using VisionInspection.Core.Abstractions;
 using VisionInspection.Core.Imaging;
@@ -30,17 +30,22 @@ namespace VisionInspection.App.Hosting
         private RuntimeService _runtime;
         private ICamera _camera;
         private IPlcClient _plc;
+        private bool _disposed;
 
         public AppSettings Settings { get; private set; }
         public IRecipeStore RecipeStore { get; }
+        public string StartupWarning { get; private set; }
 
         // 对外稳定事件（转发当前 runtime）
         public event Action<InspectionSnapshot> SnapshotReady;
         public event Action<RuntimeAlarm> Alarm;
         public event Action<string> Log;
+        public event Action<RuntimeLogEvent> StructuredLog;
         public event Action<bool> CameraConnectionChanged;
         public event Action<bool> PlcConnectionChanged;
         public event Action<bool> HeartbeatChanged;
+        public event Action<RuntimeState> StateChanged;
+        public event Action RuntimeRebuilt;
 
         public ApplicationHost(string baseDir, Func<ImageFrame> demoFrameFactory,
             Func<int, int, ImageFrame> demoBoardFactory = null)
@@ -50,64 +55,143 @@ namespace VisionInspection.App.Hosting
             _demoBoardFactory = demoBoardFactory;
             RecipeStore = new JsonRecipeStore(Path.Combine(baseDir, "recipes"));
             _settingsStore = new AppSettingsStore(Path.Combine(baseDir, "settings.json"));
-            Settings = _settingsStore.LoadOrDefault();
+            var load = _settingsStore.Load();
+            Settings = load.Settings;
+            StartupWarning = load.Warning;
+            ValidateSettings(Settings);
             BuildRuntime();
         }
 
         /// <summary>保存并应用新配置：重建运行链，即时生效。</summary>
         public void ApplySettings(AppSettings settings)
         {
-            Settings = settings;
-            _settingsStore.Save(settings);
-            BuildRuntime();
+            if (settings == null) throw new ArgumentNullException(nameof(settings));
+            ValidateSettings(settings);
+
+            var oldSettings = Settings;
+            var oldRuntime = _runtime;
+            var oldCamera = _camera;
+            var oldPlc = _plc;
+
+            RuntimeService newRuntime = null;
+            ICamera newCamera = null;
+            IPlcClient newPlc = null;
+            try
+            {
+                BuildRuntime(settings, out newRuntime, out newCamera, out newPlc);
+                Settings = settings;
+                _settingsStore.Save(settings);
+
+                _runtime = newRuntime;
+                _camera = newCamera;
+                _plc = newPlc;
+                DetachRuntime(oldRuntime);
+                oldRuntime?.Dispose();
+                oldCamera?.Dispose();
+                oldPlc?.Dispose();
+                RuntimeRebuilt?.Invoke();
+            }
+            catch
+            {
+                newRuntime?.Dispose();
+                newCamera?.Dispose();
+                newPlc?.Dispose();
+                Settings = oldSettings;
+                _runtime = oldRuntime;
+                _camera = oldCamera;
+                _plc = oldPlc;
+                throw;
+            }
         }
 
         private void BuildRuntime()
         {
-            _runtime?.Dispose();
+            BuildRuntime(Settings, out _runtime, out _camera, out _plc);
+        }
 
-            _camera = CreateCamera(Settings.Camera);
-            _plc = CreatePlc(Settings.Plc);
+        private void BuildRuntime(AppSettings settings, out RuntimeService runtime, out ICamera camera, out IPlcClient plc)
+        {
+            camera = CreateCamera(settings.Camera);
+            plc = CreatePlc(settings.Plc);
 
-            var detector = new ForegroundRatioDetector(Settings.Detection.DarkIsForeground, Settings.Detection.GrayThreshold);
+            var detector = new ForegroundRatioDetector(settings.Detection.DarkIsForeground, settings.Detection.GrayThreshold);
             // 配准:配方 Fiducial.Type=None 时 FiducialAlignment 退化为恒等,故演示不受影响;
             // 配方配置基准点后即自动补偿底板摆放偏差。
             var inspector = new OpenCvInspector(new FiducialAlignment(), new IPresenceDetector[] { detector });
 
-            var archiver = new InspectionArchiver(
-                Path.Combine(_baseDir, Settings.Archive.Directory),
-                Settings.Archive.SaveNgImageOnly, Settings.Archive.RetentionDays);
+            var archiveRoot = Path.Combine(_baseDir, settings.Archive.Directory);
+            var archiver = new SpoolingInspectionArchiver(new InspectionArchiver(
+                archiveRoot, settings.Archive.SaveNgImageOnly, settings.Archive.RetentionDays),
+                Path.Combine(archiveRoot, ".spool"));
 
             var options = new RuntimeOptions
             {
-                PollIntervalMs = Settings.Runtime.PollIntervalMs,
-                GrabTimeoutMs = Settings.Runtime.GrabTimeoutMs,
-                HeartbeatIntervalMs = Settings.Runtime.HeartbeatIntervalMs,
-                InspectTimeoutMs = Settings.Runtime.InspectTimeoutMs,
-                FaultBackoffMs = Settings.Runtime.FaultBackoffMs
+                PollIntervalMs = settings.Runtime.PollIntervalMs,
+                GrabTimeoutMs = settings.Runtime.GrabTimeoutMs,
+                HeartbeatIntervalMs = settings.Runtime.HeartbeatIntervalMs,
+                InspectTimeoutMs = settings.Runtime.InspectTimeoutMs,
+                FaultBackoffMs = settings.Runtime.FaultBackoffMs
             };
 
-            _runtime = new RuntimeService(_camera, inspector, _plc, RecipeStore, archiver, options,
-                Settings.Handshake, Path.Combine(_baseDir, "stats.json"));
-            _runtime.SnapshotReady += s => SnapshotReady?.Invoke(s);
-            _runtime.Alarm += a => Alarm?.Invoke(a);
-            _runtime.Log += m => Log?.Invoke(m);
-            _runtime.CameraConnectionChanged += c => CameraConnectionChanged?.Invoke(c);
-            _runtime.PlcConnectionChanged += c => PlcConnectionChanged?.Invoke(c);
-            _runtime.HeartbeatChanged += h => HeartbeatChanged?.Invoke(h);
+            var statsStore = new StatisticsStore(Path.Combine(_baseDir, "stats.json"));
+            runtime = new RuntimeService(camera, inspector, plc, RecipeStore, archiver, options,
+                settings.Handshake, statsStore, ownsDevices: false);
+            AttachRuntime(runtime);
         }
+
+        private void AttachRuntime(RuntimeService runtime)
+        {
+            runtime.SnapshotReady += ForwardSnapshotReady;
+            runtime.Alarm += ForwardAlarm;
+            runtime.Log += ForwardLog;
+            runtime.StructuredLog += ForwardStructuredLog;
+            runtime.CameraConnectionChanged += ForwardCameraConnectionChanged;
+            runtime.PlcConnectionChanged += ForwardPlcConnectionChanged;
+            runtime.HeartbeatChanged += ForwardHeartbeatChanged;
+            runtime.StateChanged += ForwardStateChanged;
+        }
+
+        private void DetachRuntime(RuntimeService runtime)
+        {
+            if (runtime == null) return;
+            runtime.SnapshotReady -= ForwardSnapshotReady;
+            runtime.Alarm -= ForwardAlarm;
+            runtime.Log -= ForwardLog;
+            runtime.StructuredLog -= ForwardStructuredLog;
+            runtime.CameraConnectionChanged -= ForwardCameraConnectionChanged;
+            runtime.PlcConnectionChanged -= ForwardPlcConnectionChanged;
+            runtime.HeartbeatChanged -= ForwardHeartbeatChanged;
+            runtime.StateChanged -= ForwardStateChanged;
+        }
+
+        private void ForwardSnapshotReady(InspectionSnapshot s) => SnapshotReady?.Invoke(s);
+        private void ForwardAlarm(RuntimeAlarm a) => Alarm?.Invoke(a);
+        private void ForwardLog(string m) => Log?.Invoke(m);
+        private void ForwardStructuredLog(RuntimeLogEvent e) => StructuredLog?.Invoke(e);
+        private void ForwardCameraConnectionChanged(bool c) => CameraConnectionChanged?.Invoke(c);
+        private void ForwardPlcConnectionChanged(bool c) => PlcConnectionChanged?.Invoke(c);
+        private void ForwardHeartbeatChanged(bool h) => HeartbeatChanged?.Invoke(h);
+        private void ForwardStateChanged(RuntimeState s) => StateChanged?.Invoke(s);
+
+        public RuntimeState State => _runtime.State;
 
         private ICamera CreateCamera(CameraSettings cs)
         {
-            switch (cs.Mode)
+            var options = new CameraOptions
             {
-                case "Offline":
-                    return new OfflineImageCamera(cs.OfflineFolder, true);
-                case "Hikvision":
-                    throw new NotSupportedException("海康相机需现场安装 MV SDK 并启用 HIKVISION 编译符号，参见 docs/camera-integration.md。");
-                default:
-                    return new SimulatedIndustrialCamera(_demoFrameFactory);
-            }
+                Kind = ParseCameraKind(cs.Mode),
+                OfflineFolder = cs.OfflineFolder,
+                Loop = true,
+                DeviceIdentifier = cs.DeviceIdentifier
+            };
+            return CameraFactory.Create(options, _demoFrameFactory);
+        }
+
+        private static CameraKind ParseCameraKind(string mode)
+        {
+            if (string.Equals(mode, "Offline", StringComparison.OrdinalIgnoreCase)) return CameraKind.Offline;
+            if (string.Equals(mode, "Hikvision", StringComparison.OrdinalIgnoreCase)) return CameraKind.Hikvision;
+            return CameraKind.Simulated;
         }
 
         private static IPlcClient CreatePlc(PlcSettings ps)
@@ -144,6 +228,9 @@ namespace VisionInspection.App.Hosting
             if (!_camera.IsConnected) ConnectDevices();
             sim.WriteInt16(Settings.Handshake.ModelCodeWord, modelCode);
             sim.WriteBool(Settings.Handshake.TriggerBit, true);
+            if (_runtime.IsRunning)
+                return;
+
             _runtime.StepOnce();
             sim.WriteBool(Settings.Handshake.TriggerBit, false);
             _runtime.StepOnce();
@@ -153,7 +240,34 @@ namespace VisionInspection.App.Hosting
 
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+            DetachRuntime(_runtime);
             _runtime?.Dispose();
+            _camera?.Dispose();
+            _plc?.Dispose();
+        }
+
+        private static void ValidateSettings(AppSettings settings)
+        {
+            if (settings.Runtime.PollIntervalMs <= 0) throw new ArgumentException("轮询周期必须大于 0。");
+            if (settings.Runtime.GrabTimeoutMs <= 0) throw new ArgumentException("取像超时必须大于 0。");
+            if (settings.Runtime.HeartbeatIntervalMs <= 0) throw new ArgumentException("心跳周期必须大于 0。");
+            if (settings.Runtime.InspectTimeoutMs < 0) throw new ArgumentException("检测超时不能为负数。");
+            if (settings.Runtime.FaultBackoffMs < 0) throw new ArgumentException("故障退避不能为负数。");
+            if (settings.Plc.Port <= 0 || settings.Plc.Port > 65535) throw new ArgumentException("PLC 端口必须在 1~65535。");
+            if (settings.Plc.TimeoutMs <= 0) throw new ArgumentException("PLC 超时必须大于 0。");
+            if (settings.Detection.GrayThreshold < 0 || settings.Detection.GrayThreshold > 255) throw new ArgumentException("灰度阈值必须在 0~255。");
+            if (settings.Handshake.DefectBitmapWordCount <= 0) throw new ArgumentException("位图字数必须大于 0。");
+            if (settings.Handshake.UseSequence)
+            {
+                if (string.IsNullOrWhiteSpace(settings.Handshake.RequestSequenceWord))
+                    throw new ArgumentException("启用序号确认时，请求序号字不能为空。");
+                if (string.IsNullOrWhiteSpace(settings.Handshake.AckSequenceWord))
+                    throw new ArgumentException("启用序号确认时，确认序号字不能为空。");
+            }
+            if (string.IsNullOrWhiteSpace(settings.Archive.Directory)) throw new ArgumentException("归档目录不能为空。");
+            if (settings.Archive.RetentionDays < 0) throw new ArgumentException("保留天数不能为负数。");
         }
     }
 }

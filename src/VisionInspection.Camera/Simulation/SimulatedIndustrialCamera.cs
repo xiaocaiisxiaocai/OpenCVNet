@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using VisionInspection.Core.Abstractions;
 using VisionInspection.Core.Imaging;
 
@@ -42,9 +43,14 @@ namespace VisionInspection.Camera.Simulation
         public void SetTriggerMode(TriggerMode mode) => _mode = mode;
 
         public ImageFrame Grab(int timeoutMs = 2000)
+            => Grab(timeoutMs, CancellationToken.None);
+
+        public ImageFrame Grab(int timeoutMs, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             EnsureConnected();
             var frame = _frameFactory();
+            cancellationToken.ThrowIfCancellationRequested();
             FrameReceived?.Invoke(this, new CameraFrameEventArgs(frame));
             return frame;
         }

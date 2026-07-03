@@ -1,3 +1,4 @@
+using System.Threading;
 using VisionInspection.Core.Imaging;
 using VisionInspection.Core.Models;
 
@@ -9,5 +10,7 @@ namespace VisionInspection.Core.Abstractions
     public interface IInspector
     {
         InspectionResult Inspect(ImageFrame frame, Recipe recipe);
+
+        InspectionResult Inspect(ImageFrame frame, Recipe recipe, CancellationToken cancellationToken);
     }
 }

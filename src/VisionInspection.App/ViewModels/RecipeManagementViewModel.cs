@@ -13,6 +13,7 @@ using VisionInspection.Camera.Offline;
 using VisionInspection.Core.Abstractions;
 using VisionInspection.Core.Imaging;
 using VisionInspection.Core.Models;
+using VisionInspection.Infrastructure.Storage;
 using VisionInspection.Vision.Teaching;
 
 namespace VisionInspection.App.ViewModels
@@ -53,6 +54,21 @@ namespace VisionInspection.App.ViewModels
 
         /// <summary>判定方法下拉仅列已实现的方法，避免选了未实现的方法而被静默回退到前景占比法。</summary>
         public DetectionMethod[] ImplementedMethods { get; } = { DetectionMethod.ForegroundRatio };
+        public StationForegroundMode[] ForegroundModes { get; } =
+        {
+            StationForegroundMode.Inherit,
+            StationForegroundMode.Bright,
+            StationForegroundMode.Dark
+        };
+        public Array FiducialTypes => Enum.GetValues(typeof(FiducialType));
+
+        [ObservableProperty] private FiducialType _fiducialType = FiducialType.None;
+        [ObservableProperty] private int _minDetectedMarks;
+        [ObservableProperty] private double _maxResidualPixels = 8.0;
+        [ObservableProperty] private double _maxRmsResidualPixels = 5.0;
+        [ObservableProperty] private double _minScale = 0.9;
+        [ObservableProperty] private double _maxScale = 1.1;
+        [ObservableProperty] private double _maxRotationDegrees = 15.0;
 
         public bool CanCaptureFromCamera => _captureFunc != null;
 
@@ -82,6 +98,14 @@ namespace VisionInspection.App.ViewModels
             RecipeName = r.Name;
             Rows = r.Rows;
             Columns = r.Columns;
+            var f = r.Fiducial ?? new FiducialConfig();
+            FiducialType = f.Type;
+            MinDetectedMarks = f.MinDetectedMarks;
+            MaxResidualPixels = f.MaxResidualPixels;
+            MaxRmsResidualPixels = f.MaxRmsResidualPixels;
+            MinScale = f.MinScale;
+            MaxScale = f.MaxScale;
+            MaxRotationDegrees = f.MaxRotationDegrees;
             Stations = new ObservableCollection<StationRowViewModel>(
                 (r.Stations ?? new List<Station>()).Select(s => new StationRowViewModel(s)));
             StatusMessage = $"已加载配方 {r.ModelCode}（{r.StationCount} 工位）";
@@ -93,6 +117,16 @@ namespace VisionInspection.App.ViewModels
             Name = RecipeName,
             Rows = Rows,
             Columns = Columns,
+            Fiducial = new FiducialConfig
+            {
+                Type = FiducialType,
+                MinDetectedMarks = MinDetectedMarks,
+                MaxResidualPixels = MaxResidualPixels,
+                MaxRmsResidualPixels = MaxRmsResidualPixels,
+                MinScale = MinScale,
+                MaxScale = MaxScale,
+                MaxRotationDegrees = MaxRotationDegrees
+            },
             Stations = Stations.Select(s => s.ToStation()).ToList(),
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -105,6 +139,13 @@ namespace VisionInspection.App.ViewModels
             RecipeName = string.Empty;
             Rows = 0;
             Columns = 0;
+            FiducialType = FiducialType.None;
+            MinDetectedMarks = 0;
+            MaxResidualPixels = 8.0;
+            MaxRmsResidualPixels = 5.0;
+            MinScale = 0.9;
+            MaxScale = 1.1;
+            MaxRotationDegrees = 15.0;
             Stations = new ObservableCollection<StationRowViewModel>();
             StatusMessage = "新建配方（取图 → 生成网格或画框 → 示教 → 保存）";
         }
@@ -298,6 +339,7 @@ namespace VisionInspection.App.ViewModels
             try
             {
                 var recipe = BuildRecipe();
+                RecipeValidator.Validate(recipe, 64);
                 _store.Save(recipe);
                 RefreshList();
                 SelectedModelCode = recipe.ModelCode;
@@ -321,22 +363,39 @@ namespace VisionInspection.App.ViewModels
 
         public void ExportTo(string path)
         {
-            File.WriteAllText(path, JsonConvert.SerializeObject(BuildRecipe(), Formatting.Indented));
-            StatusMessage = "已导出：" + path;
+            try
+            {
+                var recipe = BuildRecipe();
+                RecipeValidator.Validate(recipe, 64);
+                AtomicFile.WriteText(path, JsonConvert.SerializeObject(recipe, Formatting.Indented), backup: true);
+                StatusMessage = "已导出：" + path;
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "导出失败：" + ex.Message;
+            }
         }
 
         public void ImportFrom(string path)
         {
-            var r = JsonConvert.DeserializeObject<Recipe>(File.ReadAllText(path));
-            if (r == null || string.IsNullOrWhiteSpace(r.ModelCode))
+            try
             {
-                StatusMessage = "导入失败：文件内容无效";
-                return;
+                var r = JsonConvert.DeserializeObject<Recipe>(File.ReadAllText(path));
+                if (r == null || string.IsNullOrWhiteSpace(r.ModelCode))
+                {
+                    StatusMessage = "导入失败：文件内容无效";
+                    return;
+                }
+                RecipeValidator.Validate(r, 64);
+                _store.Save(r);
+                RefreshList();
+                SelectedModelCode = r.ModelCode;
+                StatusMessage = "已导入配方 " + r.ModelCode;
             }
-            _store.Save(r);
-            RefreshList();
-            SelectedModelCode = r.ModelCode;
-            StatusMessage = "已导入配方 " + r.ModelCode;
+            catch (Exception ex)
+            {
+                StatusMessage = "导入失败：" + ex.Message;
+            }
         }
 
         public void TeachFromFiles(IEnumerable<string> presentFiles, IEnumerable<string> absentFiles)
@@ -356,12 +415,20 @@ namespace VisionInspection.App.ViewModels
                 return;
             }
 
-            var thresholds = new ThresholdTeacher().Teach(recipe, present, absent);
-            foreach (var row in Stations)
-                if (thresholds.TryGetValue(row.Index, out var th))
-                    row.Threshold = Math.Round(th, 4);
+            try
+            {
+                RecipeValidator.Validate(recipe, 64);
+                var thresholds = new ThresholdTeacher().Teach(recipe, present, absent);
+                foreach (var row in Stations)
+                    if (thresholds.TryGetValue(row.Index, out var th))
+                        row.Threshold = Math.Round(th, 4);
 
-            StatusMessage = $"示教完成：更新 {thresholds.Count} 个工位阈值（请记得保存）";
+                StatusMessage = $"示教完成：更新 {thresholds.Count} 个工位阈值（请记得保存）";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "示教失败：" + ex.Message;
+            }
         }
 
         private static List<ImageFrame> LoadFrames(IEnumerable<string> files)

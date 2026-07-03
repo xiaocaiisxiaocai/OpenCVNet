@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net48</TargetFramework>
+    <LangVersion Condition="'$(LangVersion)' == ''">8.0</LangVersion>
+    <Nullable Condition="'$(Nullable)' == ''">disable</Nullable>
+    <PlatformTarget Condition="'$(PlatformTarget)' == ''">x64</PlatformTarget>
+  </PropertyGroup>
+</Project>

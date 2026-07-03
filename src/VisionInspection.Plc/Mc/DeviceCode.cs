@@ -19,7 +19,7 @@ namespace VisionInspection.Plc.Mc
 
     /// <summary>
     /// 软元件地址解析（字符串 → <see cref="DeviceAddress"/>）。
-    /// 号的进制随软元件类型：M/D/L/R 十进制；X/Y/B/W/ZR 十六进制。
+    /// 号的进制随软元件类型：M/D/L/R 十进制；B/W/ZR 十六进制；X/Y 默认按 FX 八进制。
     /// </summary>
     public static class DeviceCode
     {
@@ -29,19 +29,16 @@ namespace VisionInspection.Plc.Mc
                 throw new ArgumentException("软元件地址为空。", nameof(address));
 
             var a = address.Trim().ToUpperInvariant();
-            int i = 0;
-            while (i < a.Length && !char.IsDigit(a[i])) i++;
-            if (i == 0 || i == a.Length)
+            string prefix = MatchPrefix(a);
+            if (prefix == null || a.Length == prefix.Length)
                 throw new FormatException("非法软元件地址：" + address);
-
-            string prefix = a.Substring(0, i);
-            string numStr = a.Substring(i);
+            string numStr = a.Substring(prefix.Length);
 
             switch (prefix)
             {
                 case "M": return new DeviceAddress(0x90, ParseNum(numStr, 10), true);
-                case "X": return new DeviceAddress(0x9C, ParseNum(numStr, 16), true);
-                case "Y": return new DeviceAddress(0x9D, ParseNum(numStr, 16), true);
+                case "X": return new DeviceAddress(0x9C, ParseNum(numStr, 8), true);
+                case "Y": return new DeviceAddress(0x9D, ParseNum(numStr, 8), true);
                 case "L": return new DeviceAddress(0x92, ParseNum(numStr, 10), true);
                 case "B": return new DeviceAddress(0xA0, ParseNum(numStr, 16), true);
                 case "D": return new DeviceAddress(0xA8, ParseNum(numStr, 10), false);
@@ -52,7 +49,15 @@ namespace VisionInspection.Plc.Mc
             }
         }
 
+        private static string MatchPrefix(string address)
+        {
+            string[] prefixes = { "ZR", "M", "X", "Y", "L", "B", "D", "W", "R" };
+            foreach (var p in prefixes)
+                if (address.StartsWith(p, StringComparison.Ordinal)) return p;
+            return null;
+        }
+
         private static int ParseNum(string s, int radix)
-            => radix == 16 ? Convert.ToInt32(s, 16) : int.Parse(s);
+            => radix == 16 || radix == 8 ? Convert.ToInt32(s, radix) : int.Parse(s);
     }
 }

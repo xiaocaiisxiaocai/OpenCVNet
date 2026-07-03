@@ -12,13 +12,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="xunit" Version="2.9.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20241108" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +28,8 @@
     <ProjectReference Include="..\..\src\VisionInspection.Vision\VisionInspection.Vision.csproj" />
     <ProjectReference Include="..\..\src\VisionInspection.Plc\VisionInspection.Plc.csproj" />
     <ProjectReference Include="..\..\src\VisionInspection.Runtime\VisionInspection.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\VisionInspection.App\VisionInspection.App.csproj" />
+    <ProjectReference Include="..\..\src\VisionInspection.Watchdog\VisionInspection.Watchdog.csproj" />
   </ItemGroup>
 
 </Project>

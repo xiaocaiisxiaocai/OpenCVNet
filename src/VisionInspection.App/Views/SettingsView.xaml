@@ -162,6 +162,10 @@
                             <StackPanel Style="{StaticResource Field}"><TextBlock Text="NG 位" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding NgBit}" /></StackPanel>
                             <StackPanel Style="{StaticResource Field}"><TextBlock Text="心跳位" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding HeartbeatBit}" /></StackPanel>
                             <StackPanel Style="{StaticResource Field}"><TextBlock Text="型号码字 (PLC→PC)" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding ModelCodeWord}" /></StackPanel>
+                            <CheckBox Content="启用序号确认" IsChecked="{Binding UseSequence}"
+                                      VerticalAlignment="Bottom" Margin="0,0,18,12" />
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="请求序号字 (PLC→PC)" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding RequestSequenceWord}" /></StackPanel>
+                            <StackPanel Style="{StaticResource Field}"><TextBlock Text="确认序号字 (PC→PLC)" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding AckSequenceWord}" /></StackPanel>
                             <StackPanel Style="{StaticResource Field}"><TextBlock Text="缺件位图起始字" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding DefectBitmapWord}" /></StackPanel>
                             <StackPanel Style="{StaticResource Field}"><TextBlock Text="位图字数" Style="{StaticResource Lbl}" /><ui:NumberBox Style="{StaticResource Num}" Minimum="1" Maximum="64" Value="{Binding DefectBitmapWordCount, Mode=TwoWay}" /></StackPanel>
                             <StackPanel Style="{StaticResource Field}"><TextBlock Text="错误码字" Style="{StaticResource Lbl}" /><TextBox Style="{StaticResource Txt}" Text="{Binding ErrorCodeWord}" /></StackPanel>
@@ -172,7 +176,7 @@
         </ScrollViewer>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
-            <ui:Button Content="保存并应用" Appearance="Primary" Command="{Binding SaveCommand}" Margin="0,0,8,0" Padding="16,8" />
+            <ui:Button Content="保存并应用" Appearance="Primary" Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}" Margin="0,0,8,0" Padding="16,8" />
             <ui:Button Content="还原" Command="{Binding ReloadCommand}" Padding="16,8" />
         </StackPanel>
 

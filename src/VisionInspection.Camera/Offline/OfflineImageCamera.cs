@@ -5,6 +5,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using VisionInspection.Core.Abstractions;
 using VisionInspection.Core.Imaging;
 using CorePixelFormat = VisionInspection.Core.Imaging.PixelFormat;
@@ -21,6 +22,7 @@ namespace VisionInspection.Camera.Offline
         private static readonly string[] SupportedExtensions = { ".png", ".jpg", ".jpeg", ".bmp" };
 
         private readonly List<string> _files;
+        private readonly string _folder;
         private readonly bool _loop;
         private int _cursor;
         private bool _connected;
@@ -29,16 +31,8 @@ namespace VisionInspection.Camera.Offline
         {
             if (string.IsNullOrWhiteSpace(folder))
                 throw new ArgumentException("图像文件夹不能为空。", nameof(folder));
-            if (!Directory.Exists(folder))
-                throw new DirectoryNotFoundException("图像文件夹不存在：" + folder);
-
-            _files = Directory.GetFiles(folder)
-                .Where(f => SupportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            if (_files.Count == 0)
-                throw new InvalidOperationException("文件夹中没有受支持的图像文件：" + folder);
-
+            _folder = folder;
+            _files = new List<string>();
             _loop = loop;
         }
 
@@ -49,6 +43,7 @@ namespace VisionInspection.Camera.Offline
 
         public void Open()
         {
+            LoadFiles();
             _connected = true;
             ConnectionChanged?.Invoke(this, new CameraConnectionEventArgs(true));
         }
@@ -63,7 +58,11 @@ namespace VisionInspection.Camera.Offline
         public void SetTriggerMode(TriggerMode mode) { }
 
         public ImageFrame Grab(int timeoutMs = 2000)
+            => Grab(timeoutMs, CancellationToken.None);
+
+        public ImageFrame Grab(int timeoutMs, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!_connected) throw new InvalidOperationException("相机未打开。");
             if (_cursor >= _files.Count)
             {
@@ -72,7 +71,9 @@ namespace VisionInspection.Camera.Offline
             }
 
             var path = _files[_cursor++];
+            cancellationToken.ThrowIfCancellationRequested();
             var frame = LoadAsFrame(path);
+            cancellationToken.ThrowIfCancellationRequested();
             FrameReceived?.Invoke(this, new CameraFrameEventArgs(frame));
             return frame;
         }
@@ -112,5 +113,19 @@ namespace VisionInspection.Camera.Offline
         }
 
         public void Dispose() => Close();
+
+        private void LoadFiles()
+        {
+            if (!Directory.Exists(_folder))
+                throw new DirectoryNotFoundException("图像文件夹不存在：" + _folder);
+
+            _files.Clear();
+            _files.AddRange(Directory.GetFiles(_folder)
+                .Where(f => SupportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase));
+            if (_files.Count == 0)
+                throw new InvalidOperationException("文件夹中没有受支持的图像文件：" + _folder);
+            _cursor = 0;
+        }
     }
 }

@@ -34,14 +34,14 @@ namespace VisionInspection.Core.Models
             Message = message;
         }
 
-        /// <summary>缺件工位数（仅统计 Absent）。</summary>
+        /// <summary>缺陷工位数（Absent / Unknown 均按需拦截统计）。</summary>
         public int MissingCount
         {
             get
             {
                 int n = 0;
                 foreach (var s in Stations)
-                    if (s.State == PresenceState.Absent) n++;
+                    if (s.IsMissing) n++;
                 return n;
             }
         }

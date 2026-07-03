@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using VisionInspection.Core.Imaging;
 
 namespace VisionInspection.Core.Abstractions
@@ -28,6 +29,9 @@ namespace VisionInspection.Core.Abstractions
 
         /// <summary>软触发同步取一帧；超时未取到应抛异常。</summary>
         ImageFrame Grab(int timeoutMs = 2000);
+
+        /// <summary>软触发同步取一帧；支持外部取消。</summary>
+        ImageFrame Grab(int timeoutMs, CancellationToken cancellationToken);
 
         /// <summary>硬触发 / 连续模式下每采到一帧上报。</summary>
         event EventHandler<CameraFrameEventArgs> FrameReceived;

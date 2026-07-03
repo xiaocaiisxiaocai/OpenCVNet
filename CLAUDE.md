@@ -25,9 +25,9 @@ dotnet run --project src/VisionInspection.App
 ```
 
 - 目标框架 **net48**（SDK 风格 csproj，`dotnet build` 可直接编译 WPF，无需 Visual Studio）。
-- 可执行项目均 `PlatformTarget=x64`（OpenCvSharp native 依赖）。
+- 可执行项目与测试工程均 `PlatformTarget=x64`（OpenCvSharp native 依赖）；测试工程另固定 `RuntimeIdentifier=win-x64`。
 - 运行时在程序目录生成 `recipes\`、`logs\`、`archive\yyyyMMdd\`、`settings.json`、`stats.json`、`heartbeat`。
-- **CI**：`.github/workflows/ci.yml` 在 `windows-latest` 上 `dotnet build`+`dotnet test`（net48/WPF/OpenCvSharp 需 Windows runner）。
+- **CI**：`.github/workflows/ci.yml` 在 `windows-latest` 上 `dotnet build`+`dotnet test`（Release 配置；net48/WPF/OpenCvSharp 需 Windows runner）。
 
 ## 架构（分层）
 
@@ -65,6 +65,9 @@ Watchdog ─ 独立进程，监控主程序崩溃自恢复
 
 ## 约定与注意
 
+- **C# 语言版本锁 8.0**：全部工程 `LangVersion=8.0`、`Nullable=disable`。勿用 C# 9+ 语法（`record`、`init`、目标类型 `new()`、文件范围命名空间、全局 using、`is not` 模式等），net48 下无法编译。
+- **JSON 统一 Newtonsoft.Json**（settings/recipes/stats 序列化均是），不引 System.Text.Json。
+- **引用 Vision 的可执行/测试工程**需自带 `OpenCvSharp4.runtime.win` 包拷贝 native DLL（App、Tests 均如此），缺了运行时抛 `DllNotFoundException`。
 - **测试无需硬件**：Vision 用 OpenCvSharp 合成底板图；Plc/相机用模拟实现；握手用内存 `SimulatedPlcClient`。
 - **判有无方向**：`ForegroundRatioDetector` 默认亮像素为前景；背光场景（有件挡光变暗）构造时传 `darkIsForeground: true`，或用示教按样本自动定阈值。检测方法目前仅实现 `ForegroundRatio`（UI 判定方法下拉已隐藏未实现项）。
 - **自动定位**：配方标定支持 `PartLocator`（`Vision.Teaching`）从底图自动识别件位置、生成贴合各件的 ROI（Otsu + 轮廓 + 面积过滤 + 行主序，亮/暗/自动极性），替代等距网格的手动微调。

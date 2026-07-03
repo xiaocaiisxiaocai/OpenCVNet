@@ -13,6 +13,9 @@ namespace VisionInspection.Plc.Handshake
         public string HeartbeatBit { get; set; } = "M120";      // PC→PLC 心跳
 
         public string ModelCodeWord { get; set; } = "D190";     // PLC→PC 当前型号码
+        public bool UseSequence { get; set; } = false;           // 可选：PLC→PC 周期序号确认模式
+        public string RequestSequenceWord { get; set; } = "D191";// PLC→PC 本次触发序号
+        public string AckSequenceWord { get; set; } = "D211";    // PC→PLC 已完成序号
         public string DefectBitmapWord { get; set; } = "D200";  // PC→PLC 缺件位图起始
         public int DefectBitmapWordCount { get; set; } = 8;     // 预留字数（8 字 = 最多 128 工位）
         public string ErrorCodeWord { get; set; } = "D210";     // PC→PLC 错误码

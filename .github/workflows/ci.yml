@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
 
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  VERSION_PREFIX: 1.0.${{ github.run_number }}
+
 jobs:
   build-test:
     runs-on: windows-latest   # net48 + WPF + OpenCvSharp(x64) 需 Windows
@@ -17,11 +22,80 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: .NET info
+        run: dotnet --info
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
       - name: Restore
         run: dotnet restore VisionInspection.sln
 
       - name: Build (Release)
-        run: dotnet build VisionInspection.sln -c Release --no-restore
+        run: dotnet build VisionInspection.sln -c Release --no-restore /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
 
       - name: Test (Release)
-        run: dotnet test VisionInspection.sln -c Release --no-build --verbosity normal
+        run: dotnet test tests/VisionInspection.Tests/VisionInspection.Tests.csproj -c Release --no-restore --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: error
+
+      - name: Publish App
+        run: dotnet publish src/VisionInspection.App/VisionInspection.App.csproj -c Release --no-build -o artifacts/app /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+
+      - name: Publish Watchdog
+        run: dotnet publish src/VisionInspection.Watchdog/VisionInspection.Watchdog.csproj -c Release --no-build -o artifacts/watchdog /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+
+      - name: Publish PlcProbe
+        run: dotnet publish src/VisionInspection.PlcProbe/VisionInspection.PlcProbe.csproj -c Release --no-build -o artifacts/plc-probe /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+
+      - name: Smoke published artifacts
+        shell: pwsh
+        run: |
+          $required = @(
+            'artifacts/app/VisionInspection.App.exe',
+            'artifacts/app/OpenCvSharpExtern.dll',
+            'artifacts/watchdog/VisionInspection.Watchdog.exe',
+            'artifacts/plc-probe/VisionInspection.PlcProbe.exe'
+          )
+          foreach ($file in $required) {
+            if (!(Test-Path $file)) {
+              throw "Missing published artifact: $file"
+            }
+            if ((Get-Item $file).Length -le 0) {
+              throw "Empty published artifact: $file"
+            }
+          }
+          $appVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo('artifacts/app/VisionInspection.App.exe').ProductVersion
+          if ([string]::IsNullOrWhiteSpace($appVersion)) {
+            throw "VisionInspection.App.exe has no ProductVersion"
+          }
+
+      - name: Write build info
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          @(
+            "RunNumber=${{ github.run_number }}"
+            "Version=${{ env.VERSION_PREFIX }}"
+            "Sha=${{ github.sha }}"
+            "Ref=${{ github.ref }}"
+            "BuiltAtUtc=$((Get-Date).ToUniversalTime().ToString('O'))"
+          ) | Set-Content -Encoding UTF8 artifacts/build-info.txt
+
+      - name: Upload publish artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vision-inspection-release
+          path: artifacts/**
+          if-no-files-found: error

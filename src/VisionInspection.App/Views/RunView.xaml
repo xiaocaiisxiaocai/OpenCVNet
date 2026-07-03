@@ -11,7 +11,7 @@
         </Grid.RowDefinitions>
 
         <!-- Row0 工具栏 -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+        <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
             <ui:Button Command="{Binding ConnectCommand}" Appearance="Secondary" Margin="0,0,6,0" Padding="12,8">
                 <StackPanel Orientation="Horizontal">
                     <ui:SymbolIcon Symbol="PlugConnected24" Margin="0,0,6,0" />
@@ -52,7 +52,7 @@
                     <TextBlock Text="清零统计" VerticalAlignment="Center" />
                 </StackPanel>
             </ui:Button>
-        </StackPanel>
+        </WrapPanel>
 
         <!-- Row1 状态栏 -->
         <ui:Card Grid.Row="1" Margin="0,0,0,10" Padding="14,10">
@@ -118,6 +118,12 @@
                     <TextBlock Text="{Binding CurrentModel}" VerticalAlignment="Center" FontWeight="Bold" FontSize="15" Margin="6,0,20,0" />
                     <TextBlock Text="节拍" VerticalAlignment="Center" Opacity="0.6" />
                     <TextBlock Text="{Binding LastCycleMs, StringFormat={}{0} ms}" VerticalAlignment="Center" FontWeight="Bold" Margin="6,0,0,0" />
+                    <TextBlock Text="最近报警" VerticalAlignment="Center" Opacity="0.6" Margin="20,0,0,0" />
+                    <TextBlock Text="{Binding LastAlarmSummary}" VerticalAlignment="Center" FontWeight="SemiBold"
+                               Margin="6,0,20,0" TextTrimming="CharacterEllipsis" MaxWidth="320" />
+                    <TextBlock Text="版本" VerticalAlignment="Center" Opacity="0.6" />
+                    <TextBlock Text="{Binding DisplayVersion}" VerticalAlignment="Center" FontWeight="SemiBold"
+                               Margin="6,0,120,0" />
                 </StackPanel>
 
                 <Border HorizontalAlignment="Right" CornerRadius="8" Padding="22,6" MinWidth="96"
@@ -131,7 +137,7 @@
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="380" />
+                <ColumnDefinition Width="0.38*" MinWidth="320" MaxWidth="430" />
             </Grid.ColumnDefinitions>
 
             <!-- 实时图像 -->

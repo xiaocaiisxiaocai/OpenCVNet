@@ -3,6 +3,7 @@ using System.Linq;
 using OpenCvSharp;
 using VisionInspection.Core.Imaging;
 using VisionInspection.Core.Models;
+using VisionInspection.Vision.Detection;
 using VisionInspection.Vision.Imaging;
 using VisionInspection.Vision.Inspection;
 using VisionInspection.Vision.Teaching;
@@ -16,6 +17,15 @@ namespace VisionInspection.Tests
     /// </summary>
     public class SyntheticInspectionTests
     {
+        private sealed class ThrowingDetector : IPresenceDetector
+        {
+            public DetectionMethod Method => DetectionMethod.ForegroundRatio;
+            public DetectionOutput Detect(Mat roiImage, Station station)
+            {
+                throw new System.InvalidOperationException("detector failed");
+            }
+        }
+
         /// <summary>构造底板：present[i]=true 时第 i 工位画一个白块（有件）。</summary>
         private static ImageFrame BuildBoard(bool[] present)
         {
@@ -90,6 +100,42 @@ namespace VisionInspection.Tests
         }
 
         [Fact]
+        public void Empty_Recipe_Yields_Error()
+        {
+            var frame = BuildBoard(new[] { true, true, true, true });
+            var result = new OpenCvInspector().Inspect(frame, new Recipe { ModelCode = "EMPTY" });
+
+            Assert.Equal(InspectionOutcome.Error, result.Outcome);
+            Assert.Equal("NO_STATION", result.ErrorCode);
+        }
+
+        [Fact]
+        public void Unsupported_Method_Yields_Unknown_And_Ng()
+        {
+            var recipe = BuildRecipe();
+            recipe.Stations[0].Method = DetectionMethod.TemplateMatch;
+
+            var result = new OpenCvInspector().Inspect(BuildBoard(new[] { true, true, true, true }), recipe);
+
+            Assert.Equal(InspectionOutcome.Ng, result.Outcome);
+            Assert.Equal(PresenceState.Unknown, result.Stations.Single(s => s.StationIndex == 0).State);
+            Assert.Equal(1, result.MissingCount);
+        }
+
+        [Fact]
+        public void Single_Station_Exception_Yields_Unknown_And_Ng()
+        {
+            var recipe = BuildRecipe();
+
+            var result = new OpenCvInspector(detectors: new IPresenceDetector[] { new ThrowingDetector() })
+                .Inspect(BuildBoard(new[] { true, true, true, true }), recipe);
+
+            Assert.Equal(InspectionOutcome.Ng, result.Outcome);
+            Assert.Equal(PresenceState.Unknown, result.Stations.Single(s => s.StationIndex == 0).State);
+            Assert.Equal(4, result.MissingCount);
+        }
+
+        [Fact]
         public void Teacher_Sets_Threshold_Between_Present_And_Absent()
         {
             var recipe = BuildRecipe();
@@ -101,6 +147,36 @@ namespace VisionInspection.Tests
             Assert.Equal(4, thresholds.Count);
             // 满件占比约 0.56、缺件约 0，标定阈值应落在两者中间。
             Assert.All(thresholds.Values, t => Assert.InRange(t, 0.2, 0.4));
+        }
+
+        [Fact]
+        public void Teacher_Auto_Selects_Dark_Foreground_When_Present_Is_Darker()
+        {
+            var recipe = BuildRecipe();
+            var present = new List<ImageFrame> { BuildBoard(new[] { false, false, false, false }) };
+            var absent = new List<ImageFrame> { BuildBoard(new[] { true, true, true, true }) };
+
+            var thresholds = new ThresholdTeacher().Teach(recipe, present, absent);
+
+            Assert.Equal(4, thresholds.Count);
+            Assert.All(recipe.Stations, s => Assert.True(s.DarkIsForeground));
+            Assert.All(thresholds.Values, t => Assert.InRange(t, 0.6, 0.9));
+        }
+
+        [Fact]
+        public void Station_Level_Polarity_Overrides_Global_Detector()
+        {
+            var recipe = BuildRecipe();
+            recipe.Stations[0].DarkIsForeground = true;
+            recipe.Stations[0].Threshold = 0.4;
+
+            var result = new OpenCvInspector(detectors: new IPresenceDetector[]
+                {
+                    new ForegroundRatioDetector(darkIsForeground: false)
+                })
+                .Inspect(BuildBoard(new[] { false, true, true, true }), recipe);
+
+            Assert.Equal(PresenceState.Present, result.Stations.Single(s => s.StationIndex == 0).State);
         }
 
         [Fact]

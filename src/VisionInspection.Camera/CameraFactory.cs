@@ -1,6 +1,8 @@
 using System;
 using VisionInspection.Camera.Offline;
+using VisionInspection.Camera.Simulation;
 using VisionInspection.Core.Abstractions;
+using VisionInspection.Core.Imaging;
 
 namespace VisionInspection.Camera
 {
@@ -38,7 +40,7 @@ namespace VisionInspection.Camera
     /// </summary>
     public static class CameraFactory
     {
-        public static ICamera Create(CameraOptions options)
+        public static ICamera Create(CameraOptions options, Func<ImageFrame> simulatedFrameFactory = null)
         {
             if (options == null) throw new ArgumentNullException(nameof(options));
 
@@ -48,8 +50,9 @@ namespace VisionInspection.Camera
                     return new OfflineImageCamera(options.OfflineFolder, options.Loop);
 
                 case CameraKind.Simulated:
-                    throw new NotSupportedException(
-                        "模拟相机需注入帧工厂，请直接 new SimulatedIndustrialCamera(frameFactory)。");
+                    if (simulatedFrameFactory == null)
+                        throw new ArgumentException("模拟相机需要提供帧工厂。", nameof(simulatedFrameFactory));
+                    return new SimulatedIndustrialCamera(simulatedFrameFactory);
 
                 case CameraKind.Hikvision:
 #if HIKVISION

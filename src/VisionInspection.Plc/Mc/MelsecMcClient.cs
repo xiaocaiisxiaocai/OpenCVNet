@@ -33,9 +33,17 @@ namespace VisionInspection.Plc.Mc
         {
             lock (_sync)
             {
-                _tcp = new TcpClient { ReceiveTimeout = _timeoutMs, SendTimeout = _timeoutMs };
-                _tcp.Connect(_host, _port);
-                _stream = _tcp.GetStream();
+                DisposeSocket();
+                var tcp = new TcpClient { ReceiveTimeout = _timeoutMs, SendTimeout = _timeoutMs };
+                var ar = tcp.BeginConnect(_host, _port, null, null);
+                if (!ar.AsyncWaitHandle.WaitOne(_timeoutMs))
+                {
+                    tcp.Close();
+                    throw new TimeoutException($"PLC 连接超时：{_host}:{_port}");
+                }
+                tcp.EndConnect(ar);
+                _tcp = tcp;
+                _stream = tcp.GetStream();
             }
             ConnectionChanged?.Invoke(this, new PlcConnectionEventArgs(true));
         }
@@ -129,6 +137,8 @@ namespace VisionInspection.Plc.Mc
         {
             // 先读固定头 9 字节（含数据长度域），再按长度读剩余。
             var head = ReadExact(stream, 9);
+            if (head[0] != 0xD0 || head[1] != 0x00)
+                throw new IOException($"PLC 响应帧副头部错误：0x{head[0]:X2} 0x{head[1]:X2}");
             int len = head[7] | (head[8] << 8);
             var body = ReadExact(stream, len);
 

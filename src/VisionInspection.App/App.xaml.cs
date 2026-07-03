@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Serilog.Core;
 using VisionInspection.App.Hosting;
+using VisionInspection.App.Settings;
 using VisionInspection.App.ViewModels;
 using VisionInspection.App.Views;
 using VisionInspection.Camera.Simulation;
@@ -53,19 +54,32 @@ namespace VisionInspection.App
             _logger = LogSetup.CreateLogger(Path.Combine(baseDir, "logs"));
             _logger.Information("程序启动");
             RegisterGlobalExceptionHandlers();
-            StartHeartbeat(baseDir);
 
             // 组合根：设置驱动(settings.json)。默认设置 = 模拟相机 + 模拟 PLC(演示)。
             // 现场改 settings.json 即可切换 海康/Melsec、握手地址、归档保留策略等,无需重编译。
             // 演示相机的两类底图:运行用随机缺件帧;配方标定用按行×列的满件底图。
-            _host = new ApplicationHost(baseDir, CreateDemoFrame,
-                (rows, cols) => CreateBoardFrame(cols > 0 ? cols : DemoCols, rows > 0 ? rows : DemoRows, -1));
-            EnsureDemoRecipe(_host.RecipeStore);
+            try
+            {
+                _host = new ApplicationHost(baseDir, CreateDemoFrame,
+                    (rows, cols) => CreateBoardFrame(cols > 0 ? cols : DemoCols, rows > 0 ? rows : DemoRows, -1));
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "运行链初始化失败，降级为默认模拟配置");
+                MessageBox.Show("配置加载失败，已降级为默认模拟配置。\n\n" + ex.Message,
+                    "板件缺件视觉检测系统", MessageBoxButton.OK, MessageBoxImage.Warning);
+                var settingsPath = Path.Combine(baseDir, "settings.json");
+                new AppSettingsStore(settingsPath).Save(new AppSettings());
+                _host = new ApplicationHost(baseDir, CreateDemoFrame,
+                    (rows, cols) => CreateBoardFrame(cols > 0 ? cols : DemoCols, rows > 0 ? rows : DemoRows, -1));
+            }
+            EnsureDemoRecipe(_host);
 
             _host.Log += m => _logger.Information("{Message}", m);
             _host.Alarm += a => _logger.Warning("[{Level}] {Message}", a.Level, a.Message);
-            _host.SnapshotReady += s => _logger.Information("检测 {Model} {Outcome} 缺件 {Missing}",
-                s.Result.ModelCode, s.Result.Outcome, s.Result.MissingCount);
+            _host.StructuredLog += WriteRuntimeLog;
+            if (!string.IsNullOrWhiteSpace(_host.StartupWarning))
+                _logger.Warning("{Message}", _host.StartupWarning);
 
             var runViewModel = new RunViewModel(_host);
             var mainViewModel = new MainWindowViewModel(_host, runViewModel);
@@ -73,6 +87,7 @@ namespace VisionInspection.App
             // 首屏渲染后自动触发一次演示检测,使界面立即有内容(真机由 PLC 触发)。
             window.ContentRendered += (s, ev) => { try { _host.SimulateTrigger(); } catch { } };
             window.Show();
+            StartHeartbeat(baseDir);
         }
 
         private void RegisterGlobalExceptionHandlers()
@@ -80,6 +95,24 @@ namespace VisionInspection.App
             DispatcherUnhandledException += OnDispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += (s, ex) =>
                 _logger?.Error(ex.ExceptionObject as Exception, "非 UI 线程未处理异常");
+        }
+
+        private void WriteRuntimeLog(RuntimeLogEvent e)
+        {
+            if (e == null || _logger == null) return;
+            var log = _logger
+                .ForContext("Source", e.Source)
+                .ForContext("EventName", e.EventName)
+                .ForContext("ModelCode", e.ModelCode)
+                .ForContext("Outcome", e.Outcome)
+                .ForContext("MissingCount", e.MissingCount);
+
+            if (string.Equals(e.Level, "Error", StringComparison.OrdinalIgnoreCase))
+                log.Error(e.Exception, "{Message}", e.Message);
+            else if (string.Equals(e.Level, "Warning", StringComparison.OrdinalIgnoreCase))
+                log.Warning(e.Exception, "{Message}", e.Message);
+            else
+                log.Information(e.Exception, "{Message}", e.Message);
         }
 
         // UI 线程心跳文件:每秒由 Dispatcher 触发刷新;UI 卡死则文件不再更新,
@@ -117,10 +150,14 @@ namespace VisionInspection.App
             base.OnExit(e);
         }
 
-        private static void EnsureDemoRecipe(IRecipeStore store)
+        private static void EnsureDemoRecipe(ApplicationHost host)
         {
-            // 型号码 "1" 为演示配方；若已存在但工位数不符（旧版本）则重写。
-            if (store.TryLoad("1", out var existing) && existing.StationCount == DemoCols * DemoRows)
+            var store = host.RecipeStore;
+            if (host.Settings.Plc.Mode == "Melsec" || host.Settings.Camera.Mode != "Simulated")
+                return;
+
+            // 型号码 "1" 已存在时一律不覆盖，避免重启改写现场生产配方。
+            if (store.TryLoad("1", out _))
                 return;
 
             var recipe = new Recipe { ModelCode = "1", Name = "演示配方 2×3", Rows = DemoRows, Columns = DemoCols };

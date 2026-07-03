@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using VisionInspection.Core.Imaging;
 using VisionInspection.Core.Models;
+using VisionInspection.Core.Abstractions;
 using CorePixelFormat = VisionInspection.Core.Imaging.PixelFormat;
 using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
 
@@ -17,7 +18,7 @@ namespace VisionInspection.Infrastructure.Archiving
     /// 结果留档：按日期（yyyyMMdd）分目录，将每次检测结果追加到 results.csv，
     /// 并对不合格（NG / Error）保存原始图像用于追溯。
     /// </summary>
-    public sealed class InspectionArchiver
+    public sealed class InspectionArchiver : IInspectionArchiver
     {
         private readonly string _root;
         private readonly bool _saveNgImageOnly;
@@ -84,7 +85,8 @@ namespace VisionInspection.Infrastructure.Archiving
             lock (_sync)
             {
                 bool exists = File.Exists(csv);
-                using (var w = new StreamWriter(csv, append: true, encoding: new UTF8Encoding(true)))
+                using (var fs = new FileStream(csv, FileMode.Append, FileAccess.Write, FileShare.Read))
+                using (var w = new StreamWriter(fs, new UTF8Encoding(true)))
                 {
                     if (!exists) w.WriteLine("时间,型号码,结论,缺件数,缺件工位,错误码,耗时ms");
                     w.WriteLine(line);
@@ -92,10 +94,24 @@ namespace VisionInspection.Infrastructure.Archiving
             }
         }
 
-        private static string Csv(string s) => string.IsNullOrEmpty(s) ? "" : s.Replace(",", "，");
+        private static string Csv(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            bool quote = s.IndexOfAny(new[] { ',', '"', '\r', '\n' }) >= 0;
+            var escaped = s.Replace("\"", "\"\"");
+            return quote ? "\"" + escaped + "\"" : escaped;
+        }
 
         private static string ImageName(InspectionResult r, DateTime local)
-            => $"{local:HHmmss_fff}_{r.ModelCode}_{r.Outcome}.png";
+            => $"{local:HHmmss_fff}_{Guid.NewGuid():N}_{SafeFileName(r.ModelCode)}_{r.Outcome}.png";
+
+        private static string SafeFileName(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "unknown";
+            var invalid = Path.GetInvalidFileNameChars();
+            var chars = value.Select(c => invalid.Contains(c) ? '_' : c).ToArray();
+            return new string(chars);
+        }
 
         private static void SaveImage(ImageFrame f, string path)
         {
@@ -147,6 +163,10 @@ namespace VisionInspection.Infrastructure.Archiving
                 bmp.UnlockBits(data);
             }
             return bmp;
+        }
+
+        public void Dispose()
+        {
         }
     }
 }

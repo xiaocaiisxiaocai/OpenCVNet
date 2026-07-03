@@ -3,6 +3,13 @@ using VisionInspection.Core.Models;
 
 namespace VisionInspection.App.ViewModels
 {
+    public enum StationForegroundMode
+    {
+        Inherit = 0,
+        Bright = 1,
+        Dark = 2
+    }
+
     /// <summary>
     /// 工位编辑行 VM：把 <see cref="RoiRect"/> 平铺为可绑定属性，便于 DataGrid 逐工位编辑
     /// （板件大小不一 → 每工位 X/Y/Width/Height 各自独立）。
@@ -19,6 +26,7 @@ namespace VisionInspection.App.ViewModels
         [ObservableProperty] private int _height;
         [ObservableProperty] private DetectionMethod _method;
         [ObservableProperty] private double _threshold;
+        [ObservableProperty] private StationForegroundMode _foregroundMode = StationForegroundMode.Inherit;
         [ObservableProperty] private bool _enabled = true;
         [ObservableProperty] private bool _isSelected;
 
@@ -38,6 +46,9 @@ namespace VisionInspection.App.ViewModels
             _height = s.Roi.Height;
             _method = s.Method;
             _threshold = s.Threshold;
+            _foregroundMode = s.DarkIsForeground.HasValue
+                ? (s.DarkIsForeground.Value ? StationForegroundMode.Dark : StationForegroundMode.Bright)
+                : StationForegroundMode.Inherit;
             _enabled = s.Enabled;
         }
 
@@ -50,6 +61,9 @@ namespace VisionInspection.App.ViewModels
             Roi = new RoiRect(X, Y, Width, Height),
             Method = Method,
             Threshold = Threshold,
+            DarkIsForeground = ForegroundMode == StationForegroundMode.Inherit
+                ? (bool?)null
+                : ForegroundMode == StationForegroundMode.Dark,
             Enabled = Enabled
         };
     }

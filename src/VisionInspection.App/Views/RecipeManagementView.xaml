@@ -4,6 +4,7 @@
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:sys="clr-namespace:System;assembly=mscorlib"
     xmlns:local="clr-namespace:VisionInspection.App.Views"
+    xmlns:conv="clr-namespace:VisionInspection.App.Converters"
     xmlns:models="clr-namespace:VisionInspection.Core.Models;assembly=VisionInspection.Core">
     <UserControl.Resources>
         <ObjectDataProvider x:Key="MethodValues" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
@@ -11,6 +12,7 @@
                 <x:Type TypeName="models:DetectionMethod" />
             </ObjectDataProvider.MethodParameters>
         </ObjectDataProvider>
+        <conv:StationForegroundNameConverter x:Key="StationForegroundName" />
     </UserControl.Resources>
 
     <Grid Margin="12">
@@ -35,6 +37,7 @@
         <!-- 右：编辑区 -->
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -63,13 +66,32 @@
                 </StackPanel>
             </UniformGrid>
 
-            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+            <Border Grid.Row="1" Background="#10000000" CornerRadius="6" Padding="8" Margin="0,0,0,8">
+                <WrapPanel>
+                    <TextBlock Text="配准" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,4" />
+                    <ComboBox ItemsSource="{Binding FiducialTypes}" SelectedItem="{Binding FiducialType}" Width="120" Margin="0,0,10,4" />
+                    <TextBlock Text="最少点" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <ui:NumberBox Value="{Binding MinDetectedMarks, Mode=TwoWay}" Minimum="0" Maximum="16" Width="90" MaxDecimalPlaces="0" ClearButtonEnabled="False" Margin="0,0,10,4" />
+                    <TextBlock Text="残差" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <ui:NumberBox Value="{Binding MaxResidualPixels, Mode=TwoWay}" Minimum="0.1" Maximum="100" Width="90" MaxDecimalPlaces="1" ClearButtonEnabled="False" Margin="0,0,10,4" />
+                    <TextBlock Text="RMS" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <ui:NumberBox Value="{Binding MaxRmsResidualPixels, Mode=TwoWay}" Minimum="0.1" Maximum="100" Width="90" MaxDecimalPlaces="1" ClearButtonEnabled="False" Margin="0,0,10,4" />
+                    <TextBlock Text="尺度" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <ui:NumberBox Value="{Binding MinScale, Mode=TwoWay}" Minimum="0.1" Maximum="10" Width="90" MaxDecimalPlaces="3" ClearButtonEnabled="False" Margin="0,0,2,4" />
+                    <TextBlock Text="~" VerticalAlignment="Center" Margin="0,0,2,4" />
+                    <ui:NumberBox Value="{Binding MaxScale, Mode=TwoWay}" Minimum="0.1" Maximum="10" Width="90" MaxDecimalPlaces="3" ClearButtonEnabled="False" Margin="0,0,10,4" />
+                    <TextBlock Text="旋转" VerticalAlignment="Center" Margin="0,0,4,4" />
+                    <ui:NumberBox Value="{Binding MaxRotationDegrees, Mode=TwoWay}" Minimum="0" Maximum="180" Width="90" MaxDecimalPlaces="1" ClearButtonEnabled="False" Margin="0,0,10,4" />
+                </WrapPanel>
+            </Border>
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
                 <TextBlock Text="工位（逐工位独立 ROI，大小可各异）" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
                 <ui:Button Content="添加工位" Command="{Binding AddStationCommand}" Margin="0,0,6,0" />
                 <ui:Button Content="删除选中" Command="{Binding RemoveStationCommand}" />
             </StackPanel>
 
-            <TabControl Grid.Row="2">
+            <TabControl Grid.Row="3">
                 <TabItem Header="图形标定">
                     <DockPanel>
                         <Border DockPanel.Dock="Top" Background="#14000000" CornerRadius="6" Padding="8" Margin="0,0,0,6">
@@ -118,13 +140,17 @@
                             <DataGridTextColumn Header="宽" Binding="{Binding Width}" Width="60" />
                             <DataGridTextColumn Header="高" Binding="{Binding Height}" Width="60" />
                             <DataGridTextColumn Header="阈值" Binding="{Binding Threshold}" Width="70" />
+                            <DataGridComboBoxColumn Header="极性"
+                                                    ItemsSource="{Binding DataContext.ForegroundModes, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                    SelectedItemBinding="{Binding ForegroundMode}"
+                                                    Width="80" />
                             <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled}" Width="50" />
                         </DataGrid.Columns>
                     </DataGrid>
                 </TabItem>
             </TabControl>
 
-            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0">
+            <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,0">
                 <TextBlock Text="判定方法：" VerticalAlignment="Center" />
                 <ComboBox Width="170" Margin="6,0,12,0"
                           ItemsSource="{Binding ImplementedMethods}"
@@ -139,7 +165,7 @@
                 <ui:Button Content="保存配方" Appearance="Primary" Command="{Binding SaveCommand}" />
             </StackPanel>
 
-            <ui:InfoBar Grid.Row="4" Margin="0,8,0,0" IsOpen="True" Severity="Informational"
+            <ui:InfoBar Grid.Row="5" Margin="0,8,0,0" IsOpen="True" Severity="Informational"
                         Title="状态" Message="{Binding StatusMessage}" />
         </Grid>
     </Grid>

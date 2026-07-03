@@ -18,6 +18,8 @@ x86/
 # —— 运行期生成物(程序目录 recipes/logs/archive/stats.json/heartbeat 等) ——
 /logs/
 /archive/
+/artifacts/
+/TestResults/
 /recipes/*.json
 /stats.json
 /heartbeat

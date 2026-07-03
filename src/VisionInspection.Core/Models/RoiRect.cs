@@ -1,16 +1,22 @@
 using System;
+using System.Runtime.Serialization;
 
 namespace VisionInspection.Core.Models
 {
     /// <summary>
     /// 工位 ROI 矩形（图像像素坐标，位于配方“标定坐标系”；运行时经定位配准映射到当前图像）。
     /// </summary>
-    public struct RoiRect : IEquatable<RoiRect>
+    [DataContract]
+    public readonly struct RoiRect : IEquatable<RoiRect>
     {
-        public int X { get; set; }
-        public int Y { get; set; }
-        public int Width { get; set; }
-        public int Height { get; set; }
+        [DataMember]
+        public int X { get; }
+        [DataMember]
+        public int Y { get; }
+        [DataMember]
+        public int Width { get; }
+        [DataMember]
+        public int Height { get; }
 
         public RoiRect(int x, int y, int width, int height)
         {

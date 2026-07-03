@@ -16,7 +16,6 @@ namespace VisionInspection.Watchdog
         private const int CheckIntervalMs = 5000;
         private const int HeartbeatStaleMs = 30000;   // 心跳超过 30s 未更新 → 判假死
         private const int GraceAfterStartMs = 20000;  // 拉起后宽限期,不做假死判定
-        private const int MaxBackoffMs = 60000;       // 退避封顶
 
         [STAThread]
         private static void Main(string[] args)
@@ -31,28 +30,40 @@ namespace VisionInspection.Watchdog
                 string logFile = Path.Combine(EnsureLogDir(workDir), "watchdog.log");
                 string heartbeatFile = Path.Combine(workDir, "heartbeat");
 
-                Log(logFile, $"看门狗启动,监控目标：{targetExe}");
+                WatchdogLog.Write(logFile, $"看门狗启动,监控目标：{targetExe}");
 
                 int consecutiveRestarts = 0;
                 DateTime lastRestart = DateTime.MinValue;
+                DateTime lastHeartbeatWrite = DateTime.MinValue;
+                var unchangedWatch = Stopwatch.StartNew();
 
                 while (true)
                 {
                     try
                     {
-                        var procs = Process.GetProcessesByName(processName);
+                        var procs = FindTargetProcesses(processName, targetExe);
                         bool running = procs.Length > 0;
                         bool inGrace = (DateTime.Now - lastRestart).TotalMilliseconds < GraceAfterStartMs;
-                        bool hung = running && !inGrace && HeartbeatStale(heartbeatFile);
+                        bool heartbeatFresh = !HeartbeatStale(heartbeatFile, ref lastHeartbeatWrite, unchangedWatch);
+                        var action = WatchdogDecision.Decide(running, heartbeatFresh, inGrace);
 
-                        if (hung)
+                        if (action == WatchdogAction.Kill)
                         {
-                            Log(logFile, "心跳超时,判定假死,结束进程…");
+                            WatchdogLog.Write(logFile, "心跳超时,判定假死,结束进程…");
+                            bool allExited = true;
                             foreach (var p in procs)
                             {
-                                try { p.Kill(); p.WaitForExit(5000); } catch { }
+                                try
+                                {
+                                    p.Kill();
+                                    if (!p.WaitForExit(5000)) allExited = false;
+                                }
+                                catch { allExited = false; }
+                                finally { p.Dispose(); }
                             }
-                            running = false;
+                            running = !allExited;
+                            if (running)
+                                WatchdogLog.Write(logFile, "目标进程未确认退出，暂不拉起新实例。");
                         }
 
                         if (!running)
@@ -61,14 +72,14 @@ namespace VisionInspection.Watchdog
                             if ((DateTime.Now - lastRestart).TotalSeconds < 60) consecutiveRestarts++;
                             else consecutiveRestarts = 1;
 
-                            if (consecutiveRestarts > 1)
+                            int backoff = WatchdogDecision.CalculateBackoffMs(consecutiveRestarts);
+                            if (backoff > 0)
                             {
-                                int backoff = Math.Min(MaxBackoffMs, 2000 * (consecutiveRestarts - 1));
-                                Log(logFile, $"退避 {backoff}ms 后重启(连续第 {consecutiveRestarts} 次)…");
+                                WatchdogLog.Write(logFile, $"退避 {backoff}ms 后重启(连续第 {consecutiveRestarts} 次)…");
                                 Thread.Sleep(backoff);
                             }
 
-                            Log(logFile, "拉起目标…");
+                            WatchdogLog.Write(logFile, "拉起目标…");
                             Process.Start(new ProcessStartInfo(targetExe)
                             {
                                 WorkingDirectory = workDir,
@@ -79,7 +90,7 @@ namespace VisionInspection.Watchdog
                     }
                     catch (Exception ex)
                     {
-                        Log(logFile, "监控异常：" + ex.Message);
+                        WatchdogLog.Write(logFile, "监控异常：" + ex);
                     }
 
                     Thread.Sleep(CheckIntervalMs);
@@ -88,14 +99,41 @@ namespace VisionInspection.Watchdog
         }
 
         /// <summary>心跳文件超期(或异常)判为陈旧;文件不存在(尚未生成)不判假死。</summary>
-        private static bool HeartbeatStale(string file)
+        private static bool HeartbeatStale(string file, ref DateTime lastWrite, Stopwatch unchangedWatch)
         {
             try
             {
                 if (!File.Exists(file)) return false;
-                return (DateTime.Now - File.GetLastWriteTime(file)).TotalMilliseconds > HeartbeatStaleMs;
+                var write = File.GetLastWriteTimeUtc(file);
+                if (write != lastWrite)
+                {
+                    lastWrite = write;
+                    unchangedWatch.Restart();
+                    return false;
+                }
+                return unchangedWatch.ElapsedMilliseconds > HeartbeatStaleMs;
             }
             catch { return false; }
+        }
+
+        private static Process[] FindTargetProcesses(string processName, string targetExe)
+        {
+            var list = new System.Collections.Generic.List<Process>();
+            foreach (var p in Process.GetProcessesByName(processName))
+            {
+                try
+                {
+                    if (string.Equals(Path.GetFullPath(p.MainModule.FileName), targetExe, StringComparison.OrdinalIgnoreCase))
+                        list.Add(p);
+                    else
+                        p.Dispose();
+                }
+                catch
+                {
+                    p.Dispose();
+                }
+            }
+            return list.ToArray();
         }
 
         private static string ResolveTarget(string[] args)
@@ -112,16 +150,5 @@ namespace VisionInspection.Watchdog
             return dir;
         }
 
-        private static void Log(string file, string message)
-        {
-            try
-            {
-                File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{Environment.NewLine}");
-            }
-            catch
-            {
-                // 日志失败不影响监控
-            }
-        }
     }
 }
