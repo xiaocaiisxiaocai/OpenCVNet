@@ -40,32 +40,25 @@ jobs:
         run: dotnet build tests/VisionInspection.Tests/VisionInspection.Tests.csproj -c Release --no-restore /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
 
       - name: Test (Release)
-        id: test
         shell: pwsh
         run: |
           dotnet test tests/VisionInspection.Tests/VisionInspection.Tests.csproj -c Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
-          "exit_code=$LASTEXITCODE" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          exit 0
-
-      - name: Report test failures
-        if: always()
-        shell: pwsh
-        run: |
-          $trx = Get-ChildItem TestResults -Filter *.trx -Recurse | Select-Object -First 1
-          if ($trx) {
-            [xml]$doc = Get-Content $trx.FullName
-            $ns = New-Object System.Xml.XmlNamespaceManager($doc.NameTable)
-            $ns.AddNamespace('t', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
-            $failed = $doc.SelectNodes('//t:UnitTestResult[@outcome!="Passed"]', $ns)
-            foreach ($case in $failed) {
-              $name = $case.testName
-              $message = $case.Output.ErrorInfo.Message -replace "`r?`n", ' '
-              $stack = $case.Output.ErrorInfo.StackTrace -replace "`r?`n", ' '
-              Write-Host "::error file=TestResults/test-results.trx,title=$name::$message $stack"
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) {
+            $trx = Get-ChildItem TestResults -Filter *.trx -Recurse | Select-Object -First 1
+            if ($trx) {
+              [xml]$doc = Get-Content $trx.FullName
+              $ns = New-Object System.Xml.XmlNamespaceManager($doc.NameTable)
+              $ns.AddNamespace('t', 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010')
+              $failed = $doc.SelectNodes('//t:UnitTestResult[@outcome!="Passed"]', $ns)
+              foreach ($case in $failed) {
+                $name = $case.testName
+                $message = $case.Output.ErrorInfo.Message -replace "`r?`n", ' '
+                $stack = $case.Output.ErrorInfo.StackTrace -replace "`r?`n", ' '
+                Write-Host "::error file=TestResults/test-results.trx,title=$name::$message $stack"
+              }
             }
-          }
-          if ('${{ steps.test.outputs.exit_code }}' -ne '0') {
-            throw "dotnet test failed with exit code ${{ steps.test.outputs.exit_code }}"
+            exit $testExitCode
           }
 
       - name: Upload test results
