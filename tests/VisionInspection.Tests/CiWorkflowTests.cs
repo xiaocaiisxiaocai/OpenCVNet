@@ -40,7 +40,9 @@ namespace VisionInspection.Tests
             var pack = File.ReadAllText(Path.Combine(root, "scripts", "package-release.ps1"));
 
             Assert.Contains("dotnet test", ci);
-            Assert.DoesNotContain("dotnet test tests\\VisionInspection.Tests\\VisionInspection.Tests.csproj -c $Configuration --no-build", ci);
+            Assert.Contains("Invoke-CiStep", ci);
+            Assert.Contains("$LASTEXITCODE", ci);
+            Assert.Contains("--no-build", ci);
             Assert.Contains("dotnet publish", ci);
             Assert.Contains("OpenCvSharpExtern.dll", ci);
             Assert.Contains("Get-FileHash", pack);

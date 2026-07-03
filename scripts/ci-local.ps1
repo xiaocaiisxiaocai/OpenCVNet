@@ -7,13 +7,21 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-dotnet restore VisionInspection.sln
-dotnet build VisionInspection.sln -c $Configuration --no-restore /p:Version=$Version /p:InformationalVersion="$Version+local"
-dotnet test tests\VisionInspection.Tests\VisionInspection.Tests.csproj -c $Configuration --no-restore --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+function Invoke-CiStep {
+    param([scriptblock]$Command)
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "命令失败，退出码：$LASTEXITCODE"
+    }
+}
 
-dotnet publish src\VisionInspection.App\VisionInspection.App.csproj -c $Configuration --no-build -o artifacts\app /p:Version=$Version /p:InformationalVersion="$Version+local"
-dotnet publish src\VisionInspection.Watchdog\VisionInspection.Watchdog.csproj -c $Configuration --no-build -o artifacts\watchdog /p:Version=$Version /p:InformationalVersion="$Version+local"
-dotnet publish src\VisionInspection.PlcProbe\VisionInspection.PlcProbe.csproj -c $Configuration --no-build -o artifacts\plc-probe /p:Version=$Version /p:InformationalVersion="$Version+local"
+Invoke-CiStep { dotnet restore tests\VisionInspection.Tests\VisionInspection.Tests.csproj }
+Invoke-CiStep { dotnet build tests\VisionInspection.Tests\VisionInspection.Tests.csproj -c $Configuration --no-restore /p:Version=$Version /p:InformationalVersion="$Version+local" }
+Invoke-CiStep { dotnet test tests\VisionInspection.Tests\VisionInspection.Tests.csproj -c $Configuration --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory TestResults }
+
+Invoke-CiStep { dotnet publish src\VisionInspection.App\VisionInspection.App.csproj -c $Configuration --no-restore -o artifacts\app /p:Version=$Version /p:InformationalVersion="$Version+local" }
+Invoke-CiStep { dotnet publish src\VisionInspection.Watchdog\VisionInspection.Watchdog.csproj -c $Configuration --no-restore -o artifacts\watchdog /p:Version=$Version /p:InformationalVersion="$Version+local" }
+Invoke-CiStep { dotnet publish src\VisionInspection.PlcProbe\VisionInspection.PlcProbe.csproj -c $Configuration --no-restore -o artifacts\plc-probe /p:Version=$Version /p:InformationalVersion="$Version+local" }
 
 $required = @(
     "artifacts\app\VisionInspection.App.exe",

@@ -34,13 +34,13 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Restore
-        run: dotnet restore VisionInspection.sln
+        run: dotnet restore tests/VisionInspection.Tests/VisionInspection.Tests.csproj
 
       - name: Build (Release)
-        run: dotnet build VisionInspection.sln -c Release --no-restore /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+        run: dotnet build tests/VisionInspection.Tests/VisionInspection.Tests.csproj -c Release --no-restore /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
 
       - name: Test (Release)
-        run: dotnet test tests/VisionInspection.Tests/VisionInspection.Tests.csproj -c Release --no-restore --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+        run: dotnet test tests/VisionInspection.Tests/VisionInspection.Tests.csproj -c Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
       - name: Upload test results
         if: always()
@@ -51,13 +51,13 @@ jobs:
           if-no-files-found: error
 
       - name: Publish App
-        run: dotnet publish src/VisionInspection.App/VisionInspection.App.csproj -c Release --no-build -o artifacts/app /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+        run: dotnet publish src/VisionInspection.App/VisionInspection.App.csproj -c Release --no-restore -o artifacts/app /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
 
       - name: Publish Watchdog
-        run: dotnet publish src/VisionInspection.Watchdog/VisionInspection.Watchdog.csproj -c Release --no-build -o artifacts/watchdog /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+        run: dotnet publish src/VisionInspection.Watchdog/VisionInspection.Watchdog.csproj -c Release --no-restore -o artifacts/watchdog /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
 
       - name: Publish PlcProbe
-        run: dotnet publish src/VisionInspection.PlcProbe/VisionInspection.PlcProbe.csproj -c Release --no-build -o artifacts/plc-probe /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+        run: dotnet publish src/VisionInspection.PlcProbe/VisionInspection.PlcProbe.csproj -c Release --no-restore -o artifacts/plc-probe /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
 
       - name: Smoke published artifacts
         shell: pwsh
