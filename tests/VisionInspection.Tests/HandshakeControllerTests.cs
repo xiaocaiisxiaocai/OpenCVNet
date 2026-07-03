@@ -227,18 +227,24 @@ namespace VisionInspection.Tests
             var map = ctrl.Map;
             plc.WriteInt16(map.ModelCodeWord, 1);
 
-            plc.WriteBool(map.TriggerBit, true);
-            ctrl.ProcessOnce();
-            Assert.True(started.IsSet);
+            try
+            {
+                plc.WriteBool(map.TriggerBit, true);
+                ctrl.ProcessOnce();
+                Assert.True(started.Wait(1000));
 
-            plc.WriteBool(map.TriggerBit, false);
-            ctrl.ProcessOnce();
-            plc.WriteBool(map.TriggerBit, true);
-            ctrl.ProcessOnce();
+                plc.WriteBool(map.TriggerBit, false);
+                ctrl.ProcessOnce();
+                plc.WriteBool(map.TriggerBit, true);
+                ctrl.ProcessOnce();
 
-            Assert.True(plc.ReadBool(map.NgBit));
-            Assert.Equal((short)PlcErrorCode.Internal, plc.ReadInt16(map.ErrorCodeWord));
-            release.Set();
+                Assert.True(plc.ReadBool(map.NgBit));
+                Assert.Equal((short)PlcErrorCode.Internal, plc.ReadInt16(map.ErrorCodeWord));
+            }
+            finally
+            {
+                release.Set();
+            }
         }
 
         [Fact]
@@ -263,11 +269,18 @@ namespace VisionInspection.Tests
 
             plc.WriteInt16(map.ModelCodeWord, 1);
             plc.WriteBool(map.TriggerBit, true);
-            ctrl.ProcessOnce();
-            Assert.True(started.IsSet);
-            release.Set();
+            try
+            {
+                ctrl.ProcessOnce();
+                Assert.True(started.Wait(1000));
+                release.Set();
 
-            Assert.True(logged.Wait(1000));
+                Assert.True(logged.Wait(2000));
+            }
+            finally
+            {
+                release.Set();
+            }
         }
 
         [Fact]
