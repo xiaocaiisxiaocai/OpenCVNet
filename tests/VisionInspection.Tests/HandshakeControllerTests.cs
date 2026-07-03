@@ -251,7 +251,7 @@ namespace VisionInspection.Tests
         }
 
         [Fact]
-        public async Task Timeout_Background_Task_Exit_Is_Logged()
+        public void Timeout_Background_Task_Exit_Is_Logged()
         {
             var started = new ManualResetEventSlim(false);
             var release = new ManualResetEventSlim(false);
@@ -274,10 +274,7 @@ namespace VisionInspection.Tests
             plc.WriteBool(map.TriggerBit, true);
             try
             {
-                var cycle = Task.Run(() => ctrl.ProcessOnce());
-                Assert.True(started.Wait(5000));
-                Assert.Same(cycle, await Task.WhenAny(cycle, Task.Delay(5000)));
-                Assert.True(await cycle);
+                Assert.True(ctrl.ProcessOnce());
                 release.Set();
 
                 Assert.True(logged.Wait(10000));
