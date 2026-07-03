@@ -70,13 +70,13 @@ jobs:
           if-no-files-found: error
 
       - name: Publish App
-        run: dotnet publish src/VisionInspection.App/VisionInspection.App.csproj -c Release --no-restore -o artifacts/app /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+        run: dotnet publish src/VisionInspection.App/VisionInspection.App.csproj -c Release -o artifacts/app /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
 
       - name: Publish Watchdog
-        run: dotnet publish src/VisionInspection.Watchdog/VisionInspection.Watchdog.csproj -c Release --no-restore -o artifacts/watchdog /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+        run: dotnet publish src/VisionInspection.Watchdog/VisionInspection.Watchdog.csproj -c Release -o artifacts/watchdog /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
 
       - name: Publish PlcProbe
-        run: dotnet publish src/VisionInspection.PlcProbe/VisionInspection.PlcProbe.csproj -c Release --no-restore -o artifacts/plc-probe /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
+        run: dotnet publish src/VisionInspection.PlcProbe/VisionInspection.PlcProbe.csproj -c Release -o artifacts/plc-probe /p:Version=${{ env.VERSION_PREFIX }} /p:InformationalVersion=${{ env.VERSION_PREFIX }}+${{ github.sha }}
 
       - name: Smoke published artifacts
         shell: pwsh

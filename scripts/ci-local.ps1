@@ -19,9 +19,9 @@ Invoke-CiStep { dotnet restore tests\VisionInspection.Tests\VisionInspection.Tes
 Invoke-CiStep { dotnet build tests\VisionInspection.Tests\VisionInspection.Tests.csproj -c $Configuration --no-restore /p:Version=$Version /p:InformationalVersion="$Version+local" }
 Invoke-CiStep { dotnet test tests\VisionInspection.Tests\VisionInspection.Tests.csproj -c $Configuration --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory TestResults }
 
-Invoke-CiStep { dotnet publish src\VisionInspection.App\VisionInspection.App.csproj -c $Configuration --no-restore -o artifacts\app /p:Version=$Version /p:InformationalVersion="$Version+local" }
-Invoke-CiStep { dotnet publish src\VisionInspection.Watchdog\VisionInspection.Watchdog.csproj -c $Configuration --no-restore -o artifacts\watchdog /p:Version=$Version /p:InformationalVersion="$Version+local" }
-Invoke-CiStep { dotnet publish src\VisionInspection.PlcProbe\VisionInspection.PlcProbe.csproj -c $Configuration --no-restore -o artifacts\plc-probe /p:Version=$Version /p:InformationalVersion="$Version+local" }
+Invoke-CiStep { dotnet publish src\VisionInspection.App\VisionInspection.App.csproj -c $Configuration -o artifacts\app /p:Version=$Version /p:InformationalVersion="$Version+local" }
+Invoke-CiStep { dotnet publish src\VisionInspection.Watchdog\VisionInspection.Watchdog.csproj -c $Configuration -o artifacts\watchdog /p:Version=$Version /p:InformationalVersion="$Version+local" }
+Invoke-CiStep { dotnet publish src\VisionInspection.PlcProbe\VisionInspection.PlcProbe.csproj -c $Configuration -o artifacts\plc-probe /p:Version=$Version /p:InformationalVersion="$Version+local" }
 
 $required = @(
     "artifacts\app\VisionInspection.App.exe",
