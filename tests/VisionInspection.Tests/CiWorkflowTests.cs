@@ -11,6 +11,8 @@ namespace VisionInspection.Tests
             var yaml = File.ReadAllText(Path.Combine(FindRepoRoot(), ".github", "workflows", "ci.yml"));
 
             Assert.Contains("--logger \"trx;LogFileName=test-results.trx\"", yaml);
+            Assert.Contains("Report test failures", yaml);
+            Assert.Contains("::error file=TestResults/test-results.trx", yaml);
             Assert.Contains("actions/upload-artifact@v4", yaml);
             Assert.Contains("dotnet publish src/VisionInspection.App/VisionInspection.App.csproj", yaml);
             Assert.Contains("dotnet publish src/VisionInspection.Watchdog/VisionInspection.Watchdog.csproj", yaml);
