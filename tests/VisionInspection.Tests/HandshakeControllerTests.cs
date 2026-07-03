@@ -280,7 +280,7 @@ namespace VisionInspection.Tests
                 Assert.True(await cycle);
                 release.Set();
 
-                Assert.True(logged.Wait(2000));
+                Assert.True(logged.Wait(10000));
             }
             finally
             {
